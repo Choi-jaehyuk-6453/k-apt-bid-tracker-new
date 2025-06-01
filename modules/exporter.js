@@ -4,7 +4,7 @@
  */
 
 const XLSX = require('xlsx');
-const htmlPdf = require('html-pdf-node');
+// const htmlPdf = require('html-pdf-node'); // PDF 라이브러리 제거
 
 /**
  * 입찰공고 데이터를 Excel 파일로 변환
@@ -259,16 +259,40 @@ async function createTemplate() {
 }
 
 /**
- * PDF 월력 생성
+ * 낙찰방법을 축약 형태로 변환
+ * @param {string} method - 낙찰방법
+ * @returns {string} 축약된 낙찰방법
+ */
+function getMethodPrefix(method) {
+    if (!method) {
+        return '';
+    }
+    
+    // 최저낙찰만 "[최저]" 형태로 표시, 나머지는 빈 문자열 반환
+    const methodLower = method.toLowerCase().trim();
+    
+    // 다양한 최저낙찰 표기 방식을 모두 처리
+    if ((methodLower.includes('최저') && methodLower.includes('낙찰')) ||
+        methodLower.includes('최저낙찰') ||
+        methodLower === '최저' ||
+        methodLower.match(/최저.{0,3}낙찰/)) {  // 최저와 낙찰 사이에 0~3글자
+        return '[최저]';
+    }
+    
+    return ''; // 적격심사나 다른 방법들은 표시하지 않음
+}
+
+/**
+ * HTML 월력 생성 (인쇄용)
  * @param {Array} bids - 입찰공고 데이터
  * @param {string} year - 년도 (기본값: 현재 년도)
  * @param {string} month - 월 (기본값: 현재 월)
  * @param {Array} selectedBids - 선택된 입찰공고 추가 정보
- * @returns {Buffer} PDF 파일 버퍼
+ * @returns {string} 완전한 HTML 파일 내용
  */
-async function exportToPdfCalendar(bids, year = null, month = null, selectedBids = []) {
+async function exportToHtmlCalendar(bids, year = null, month = null, selectedBids = []) {
     try {
-        console.log('PDF 월력 생성 시작...');
+        console.log('HTML 월력 생성 시작...');
         
         // 기본값 설정
         const now = new Date();
@@ -282,30 +306,251 @@ async function exportToPdfCalendar(bids, year = null, month = null, selectedBids
         const calendarHtml = generateCalendarHtml(bids, targetYear, targetMonth, selectedBids);
         console.log('HTML 생성 완료');
         
-        // PDF 옵션 설정
-        const options = {
-            format: 'A4',
-            landscape: true,
-            printBackground: true,
-            margin: {
-                top: '0mm',
-                right: '0mm',
-                bottom: '0mm',
-                left: '0mm'
+        // 완전한 HTML 문서 생성 (인쇄용 안내 포함)
+        const completeHtml = `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K-apt 입찰공고 4주 일정 - ${targetYear}년 ${targetMonth}월</title>
+    <style>
+        /* 인쇄 안내 스타일 */
+        .print-instructions {
+            background: #e3f2fd;
+            border: 2px solid #1976d2;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px;
+            font-family: 'Malgun Gothic', Arial, sans-serif;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .print-instructions h2 {
+            color: #1976d2;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .print-instructions .step {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #1976d2;
+        }
+        .print-instructions .step-number {
+            background: #1976d2;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .print-button {
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+        .print-button:hover {
+            background: #1565c0;
+        }
+        
+        /* 인쇄 시 안내 숨김 */
+        @media print {
+            .print-instructions {
+                display: none !important;
             }
-        };
+            body {
+                margin: 0;
+                padding: 0;
+            }
+        }
         
-        const file = { content: calendarHtml };
+        /* 기존 월력 스타일 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            font-family: 'Malgun Gothic', Arial, sans-serif;
+            font-size: 10px;
+            line-height: 1.2;
+        }
+        .calendar-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .calendar-header {
+            text-align: center;
+            padding: 8px 0;
+            background-color: #2c5aa0;
+            color: white;
+            margin-bottom: 8px;
+        }
+        .calendar-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        .calendar-subtitle {
+            font-size: 11px;
+            opacity: 0.9;
+        }
+        .calendar-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 0 5mm;
+        }
+        .calendar-grid {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #2c5aa0;
+            flex: 1;
+            min-height: 600px;
+        }
+        .day-header {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            text-align: center;
+            padding: 8px 3px;
+            border: 1px solid #dee2e6;
+            font-size: 12px;
+            height: 40px;
+        }
+        .sunday { color: #dc3545; }
+        .saturday { color: #0066cc; }
+        .calendar-cell {
+            width: 14.28%;
+            border: 1px solid #dee2e6;
+            vertical-align: top;
+            padding: 4px;
+            position: relative;
+            height: 150px;
+        }
+        .date-number {
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 3px;
+        }
+        .bid-item {
+            font-size: 9px;
+            padding: 2px 3px;
+            margin: 1px 0;
+            border-radius: 1px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.2;
+        }
+        .bid-deadline {
+            background-color: #ffebee;
+            border-left: 2px solid #d32f2f;
+            color: #b71c1c;
+        }
+        .bid-sitevisit {
+            background-color: #e8f5e8;
+            border-left: 2px solid #4caf50;
+            color: #2e7d32;
+        }
+        .bid-sitept {
+            background-color: #fff3e0;
+            border-left: 2px solid #ff9800;
+            color: #e65100;
+        }
+        .legend {
+            margin-top: 8px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding-bottom: 10px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 9px;
+        }
+        .legend-color {
+            width: 10px;
+            height: 10px;
+            margin-right: 3px;
+            border-radius: 1px;
+        }
+        .today {
+            background-color: #fff8e1;
+            border: 2px solid #ffa000;
+        }
         
-        console.log('PDF 생성 중...');
-        const pdfBuffer = await htmlPdf.generatePdf(file, options);
+        /* 인쇄용 최적화 */
+        @media print {
+            .calendar-container {
+                height: 100vh;
+                page-break-inside: avoid;
+            }
+            .calendar-grid {
+                min-height: calc(100vh - 150px);
+            }
+            .calendar-cell {
+                height: calc((100vh - 200px) / 4);
+            }
+        }
         
-        console.log(`PDF 생성 완료: ${pdfBuffer.length} bytes`);
-        return pdfBuffer;
+        @page {
+            size: A4 landscape;
+            margin: 10mm;
+        }
+    </style>
+</head>
+<body>
+    <!-- 인쇄 안내 (인쇄 시 숨김) -->
+    <div class="print-instructions">
+        <h2>📋 PDF 저장 안내</h2>
+        <div class="step">
+            <span class="step-number">1</span>
+            <strong>아래 "인쇄하기" 버튼을 클릭</strong>하거나 <strong>Ctrl+P</strong> (Mac: Cmd+P)를 누르세요
+        </div>
+        <div class="step">
+            <span class="step-number">2</span>
+            프린터 선택에서 <strong>"PDF로 저장"</strong> 또는 <strong>"Microsoft Print to PDF"</strong>를 선택하세요
+        </div>
+        <div class="step">
+            <span class="step-number">3</span>
+            용지 방향을 <strong>"가로"</strong>로 설정하고 여백을 <strong>"최소"</strong>로 설정하세요
+        </div>
+        <div class="step">
+            <span class="step-number">4</span>
+            <strong>"저장"</strong> 버튼을 클릭하여 PDF 파일로 저장하세요
+        </div>
+        <div style="text-align: center; margin-top: 20px;">
+            <button class="print-button" onclick="window.print()">🖨️ 인쇄하기 (PDF 저장)</button>
+            <button class="print-button" onclick="window.close()">❌ 닫기</button>
+        </div>
+    </div>
+
+    <!-- 월력 내용 -->
+    ${calendarHtml}
+</body>
+</html>`;
+        
+        console.log(`HTML 월력 생성 완료: ${completeHtml.length} characters`);
+        return completeHtml;
         
     } catch (error) {
-        console.error('PDF 월력 생성 오류:', error);
-        throw new Error(`PDF 월력 생성 실패: ${error.message}`);
+        console.error('HTML 월력 생성 오류:', error);
+        throw new Error(`HTML 월력 생성 실패: ${error.message}`);
     }
 }
 
@@ -559,7 +804,7 @@ function generateCalendarHtml(bids, year, month, selectedBids = []) {
                         infoStr = `(${infoParts.join(', ')})`;
                     }
                     
-                    cellContent += `<div class="bid-item bid-deadline" title="마감: ${bid.title}">${bid.aptName}${infoStr}</div>`;
+                    cellContent += `<div class="bid-item bid-deadline" title="마감: ${bid.title}">${getMethodPrefix(bid.method)}${bid.aptName}${infoStr}</div>`;
                 } else if (bid.eventType === 'siteVisit') {
                     let timeStr = '';
                     if (bid.eventTime && bid.eventTime.startTime && bid.eventTime.endTime) {
@@ -567,10 +812,10 @@ function generateCalendarHtml(bids, year, month, selectedBids = []) {
                     } else if (bid.eventTime && bid.eventTime.startTime) {
                         timeStr = `(${bid.eventTime.startTime}~)`;
                     }
-                    cellContent += `<div class="bid-item bid-sitevisit" title="현장설명회: ${bid.title}">${bid.aptName}${timeStr}</div>`;
+                    cellContent += `<div class="bid-item bid-sitevisit" title="현장설명회: ${bid.title}">${getMethodPrefix(bid.method)}${bid.aptName}${timeStr}</div>`;
                 } else if (bid.eventType === 'sitePT') {
                     const timeStr = bid.eventTime ? `(${bid.eventTime})` : '';
-                    cellContent += `<div class="bid-item bid-sitept" title="현장PT: ${bid.title}">${bid.aptName}${timeStr}</div>`;
+                    cellContent += `<div class="bid-item bid-sitept" title="현장PT: ${bid.title}">${getMethodPrefix(bid.method)}${bid.aptName}${timeStr}</div>`;
                 }
             });
             
@@ -636,6 +881,7 @@ function organizeBidsByDate(bids, year, month, selectedBids = []) {
     // 선택된 입찰공고만 처리 (기본 마감일 정보 포함)
     selectedBids.forEach(selectedBid => {
         console.log(`선택된 입찰공고 처리: ${selectedBid.aptName}`);
+        console.log(`낙찰방법: "${selectedBid.method}"`);
         console.log(`입찰시간: ${selectedBid.bidTime}, 제출방법: ${selectedBid.submissionMethod}`);
         console.log(`현장설명회: ${JSON.stringify(selectedBid.siteVisit)}`);
         console.log(`현장PT: ${JSON.stringify(selectedBid.sitePT)}`);
@@ -652,7 +898,7 @@ function organizeBidsByDate(bids, year, month, selectedBids = []) {
                     ...selectedBid,
                     eventType: 'deadline'
                 });
-                console.log(`마감일 이벤트 추가됨: ${dateKey}`);
+                console.log(`마감일 이벤트 추가됨: ${dateKey}, 낙찰방법: "${selectedBid.method}"`);
             }
         }
         
@@ -673,7 +919,7 @@ function organizeBidsByDate(bids, year, month, selectedBids = []) {
                         endTime: selectedBid.siteVisit.endTime
                     }
                 });
-                console.log(`현장설명회 이벤트 추가됨: ${dateKey} (${selectedBid.siteVisit.startTime}~${selectedBid.siteVisit.endTime})`);
+                console.log(`현장설명회 이벤트 추가됨: ${dateKey} (${selectedBid.siteVisit.startTime}~${selectedBid.siteVisit.endTime}), 낙찰방법: "${selectedBid.method}"`);
             }
         }
         
@@ -691,7 +937,7 @@ function organizeBidsByDate(bids, year, month, selectedBids = []) {
                     eventType: 'sitePT',
                     eventTime: selectedBid.sitePT.time
                 });
-                console.log(`현장PT 이벤트 추가됨: ${dateKey}`);
+                console.log(`현장PT 이벤트 추가됨: ${dateKey}, 낙찰방법: "${selectedBid.method}"`);
             }
         }
     });
@@ -704,7 +950,7 @@ module.exports = {
     exportFilteredData,
     createTemplate,
     calculateBidStatistics,
-    exportToPdfCalendar,
+    exportToHtmlCalendar,
     generateCalendarHtml,
     organizeBidsByDate
 }; 

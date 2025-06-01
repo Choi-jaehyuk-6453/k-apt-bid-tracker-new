@@ -7,7 +7,7 @@ const schedule = require('node-schedule');
 const { scrapeBids } = require('./modules/scraper');
 const { saveData, loadData } = require('./modules/storage');
 const { scheduleUpdates, sendNotification } = require('./modules/scheduler');
-const { exportToExcel, exportToPdfCalendar } = require('./modules/exporter');
+const { exportToExcel, exportToHtmlCalendar } = require('./modules/exporter');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -137,21 +137,30 @@ app.post('/api/export-pdf', async (req, res) => {
         const bids = await loadData('bids.json') || [];
         const { year, month, selectedBids } = req.body;
         
-        const pdfBuffer = await exportToPdfCalendar(bids, year, month, selectedBids);
+        console.log('=== HTML 월력 내보내기 시작 ===');
+        console.log(`선택된 입찰공고 개수: ${selectedBids ? selectedBids.length : 0}`);
+        
+        if (selectedBids && selectedBids.length > 0) {
+            selectedBids.forEach((bid, index) => {
+                console.log(`[${index + 1}] ${bid.aptName} - 낙찰방법: "${bid.method}"`);
+            });
+        }
+        
+        const htmlContent = await exportToHtmlCalendar(bids, year, month, selectedBids);
         
         const now = new Date();
         const targetYear = year || now.getFullYear();
         const targetMonth = month || (now.getMonth() + 1);
         
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename=k-apt-calendar-${targetYear}-${String(targetMonth).padStart(2, '0')}.pdf`);
-        res.send(pdfBuffer);
+        res.setHeader('Content-Type', 'text/html');
+        res.setHeader('Content-Disposition', `attachment; filename=k-apt-calendar-${targetYear}-${String(targetMonth).padStart(2, '0')}.html`);
+        res.send(htmlContent);
         
     } catch (error) {
-        console.error('PDF export error:', error);
+        console.error('HTML export error:', error);
         res.status(500).json({
             success: false,
-            message: 'PDF 월력 내보내기 중 오류가 발생했습니다.',
+            message: 'HTML 월력 내보내기 중 오류가 발생했습니다.',
             error: error.message
         });
     }
