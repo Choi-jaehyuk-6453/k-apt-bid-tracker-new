@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K-apt 입찰공고 관리 시스템</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <!-- Header -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-building"></i> K-apt 입찰공고 관리
+            </span>
+            <div class="navbar-nav ms-auto">
+                <button id="updateBtn" class="btn btn-outline-light me-3">
+                    <i class="bi bi-arrow-clockwise"></i> 수동 업데이트
+                </button>
+                <div class="navbar-text text-end">
+                    <div id="lastUpdate">
+                        <i class="bi bi-clock"></i> 마지막 업데이트: --
+                    </div>
+                    <small class="text-white-50">자동 업데이트: 09:00, 17:00</small>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-4">
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-success">오늘 등록</h5>
+                        <h3 id="todayRegisteredCount" class="text-success">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-danger">오늘 마감</h5>
+                        <h3 id="todayDeadlineCount" class="text-danger">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-warning">이번주 내 마감</h5>
+                        <h3 id="weekDeadlineCount" class="text-warning">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-info">적격심사</h5>
+                        <h3 id="qualificationCount" class="text-info">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-primary">최저낙찰</h5>
+                        <h3 id="lowestBidCount" class="text-primary">0</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-search"></i>
+                            </span>
+                            <input type="text" id="searchInput" class="form-control" 
+                                   placeholder="단지명으로 검색...">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <select id="methodFilter" class="form-select">
+                            <option value="">전체 낙찰방법</option>
+                            <option value="적격심사">적격심사</option>
+                            <option value="최저 낙찰">최저 낙찰</option>
+                            <option value="경쟁입찰">경쟁입찰</option>
+                            <option value="수의계약">수의계약</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bid List Table -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-list-ul"></i> 입찰공고 목록
+                    <span id="filteredCount" class="badge bg-secondary ms-2">0건</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>선택</th>
+                                <th>공고일</th>
+                                <th>낙찰방법</th>
+                                <th>공고명</th>
+                                <th>단지명</th>
+                                <th>입찰마감일</th>
+                                <th>바로가기</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bidTableBody">
+                            <!-- 데이터가 여기에 동적으로 추가됩니다 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer">
+                <nav>
+                    <ul class="pagination pagination-sm justify-content-center mb-0" id="pagination">
+                        <!-- 페이지네이션이 여기에 동적으로 추가됩니다 -->
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        
+        <!-- 입찰예정 섹션 -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-calendar-check"></i> 입찰예정
+                    <span id="selectedBidsCount" class="badge bg-primary ms-2">0건</span>
+                    <button id="resetSelectedBidsBtn" class="btn btn-sm btn-outline-danger ms-auto" title="입찰예정 정보 초기화">
+                        <i class="bi bi-arrow-clockwise"></i> 초기화
+                    </button>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="selectedBidsContainer">
+                    <p class="text-muted text-center">입찰할 공고를 선택해주세요.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Export Buttons -->
+        <div class="card mt-3">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col text-center">
+                        <button id="exportExcelBtn" class="btn btn-success me-2">
+                            <i class="bi bi-file-earmark-excel"></i> Excel 내보내기
+                        </button>
+                        <button id="exportPdfBtn" class="btn btn-danger">
+                            <i class="bi bi-file-earmark-pdf"></i> PDF 월력 내보내기
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal fade" id="detailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">입찰공고 상세정보</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modalBody">
+                    <!-- 상세 정보가 여기에 표시됩니다 -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="d-none">
+        <div class="position-fixed top-50 start-50 translate-middle">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="js/app.js"></script>
+</body>
+</html> 

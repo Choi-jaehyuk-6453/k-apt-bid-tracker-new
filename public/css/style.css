@@ -1,0 +1,236 @@
+/* Custom styles for K-apt Bid Tracker */
+
+/* General styles */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Navbar styles */
+.navbar-brand {
+    font-weight: 600;
+}
+
+/* Card enhancements */
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+/* Table styles */
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.075);
+    cursor: pointer;
+}
+
+/* Status badges */
+.status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.badge-new {
+    background-color: #28a745;
+}
+
+.badge-ongoing {
+    background-color: #17a2b8;
+}
+
+.badge-deadline {
+    background-color: #dc3545;
+}
+
+.badge-closed {
+    background-color: #6c757d;
+}
+
+/* Region badges */
+.region-badge {
+    background-color: #e9ecef;
+    color: #495057;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+}
+
+/* Category badges */
+.category-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.category-사업자 {
+    background-color: #e3f2fd;
+    color: #0d47a1;
+}
+
+.category-용역 {
+    background-color: #f3e5f5;
+    color: #4a148c;
+}
+
+.category-경비 {
+    background-color: #e8f5e8;
+    color: #1b5e20;
+}
+
+/* Deadline warnings */
+.deadline-urgent {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.deadline-warning {
+    color: #fd7e14;
+    font-weight: 500;
+}
+
+.deadline-normal {
+    color: #28a745;
+}
+
+/* Loading spinner overlay */
+#loadingSpinner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+}
+
+/* Statistics cards */
+.card-body h3 {
+    font-weight: 700;
+    margin-bottom: 0;
+}
+
+/* Search and filter section */
+.form-select-sm,
+.form-control {
+    border-radius: 0.375rem;
+}
+
+/* Custom scrollbar for table */
+.table-responsive::-webkit-scrollbar {
+    height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Button enhancements */
+.btn {
+    border-radius: 0.375rem;
+    font-weight: 500;
+}
+
+.btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+}
+
+/* Modal enhancements */
+.modal-content {
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* Pagination styles */
+.pagination-sm .page-link {
+    border-radius: 0.375rem;
+    margin: 0 2px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    .card-body {
+        padding: 1rem 0.75rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .btn {
+        font-size: 0.875rem;
+        padding: 0.375rem 0.75rem;
+    }
+}
+
+/* Animation classes */
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateY(-10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Custom tooltip styles */
+.tooltip {
+    font-size: 0.875rem;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6c757d;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    color: #dee2e6;
+}
+
+/* Search highlight */
+.search-highlight {
+    background-color: #fff3cd;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+} 
