@@ -564,6 +564,21 @@ class BidTracker {
             return bid.detailLink;
         }
         
+        // 1개월 전부터 현재 날짜까지 동적으로 계산
+        const today = new Date();
+        const oneMonthAgo = new Date(today);
+        oneMonthAgo.setMonth(today.getMonth() - 1);
+        
+        const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        
+        const dateStart = formatDate(oneMonthAgo);
+        const dateEnd = formatDate(today);
+        
         // 대안: K-apt 사이트의 검색 결과로 이동 (단지명으로 검색)
         const baseUrl = 'https://www.k-apt.go.kr/bid/bidList.do';
         const params = new URLSearchParams({
@@ -571,8 +586,8 @@ class BidTracker {
             bidTitle: '', // 공고명은 빈값
             aptName: bid.aptName, // 단지명으로 검색
             searchDateGb: 'reg',
-            dateStart: '2025-05-01',
-            dateEnd: '2025-05-31',
+            dateStart: dateStart,
+            dateEnd: dateEnd,
             dateArea: '1',
             bidState: '',
             codeAuth: '',
