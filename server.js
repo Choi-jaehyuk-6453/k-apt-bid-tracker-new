@@ -216,6 +216,148 @@ app.get('/api/selected-bids', async (req, res) => {
     }
 });
 
+// 🔄 선택된 입찰공고 저장소 관리 API (새로 추가)
+
+// 저장소 목록 조회
+app.get('/api/saved-selections', async (req, res) => {
+    try {
+        const fs = require('fs');
+        const dataDir = path.join(__dirname, 'data');
+        
+        const savedFiles = fs.readdirSync(dataDir)
+            .filter(file => file.startsWith('saved-selection-'))
+            .map(file => {
+                const filePath = path.join(dataDir, file);
+                const stats = fs.statSync(filePath);
+                const timestamp = file.replace('saved-selection-', '').replace('.json', '');
+                
+                return {
+                    filename: file,
+                    timestamp: timestamp,
+                    date: stats.mtime,
+                    size: stats.size,
+                    displayName: new Date(stats.mtime).toLocaleString('ko-KR')
+                };
+            })
+            .sort((a, b) => b.date - a.date); // 최신순 정렬
+        
+        res.json({
+            success: true,
+            savedSelections: savedFiles
+        });
+    } catch (error) {
+        console.error('저장소 목록 조회 오류:', error);
+        res.status(500).json({
+            success: false,
+            message: '저장소 목록을 불러올 수 없습니다.'
+        });
+    }
+});
+
+// 선택된 입찰공고 저장 (날짜/시간 자동 생성)
+app.post('/api/save-selection', async (req, res) => {
+    try {
+        const { selectedBids } = req.body;
+        const now = new Date();
+        const timestamp = now.toISOString().replace(/[:.]/g, '-');
+        const filename = `saved-selection-${timestamp}.json`;
+        
+        await saveData(filename, selectedBids);
+        
+        const itemCount = Object.keys(selectedBids).length;
+        
+        res.json({
+            success: true,
+            message: `선택된 입찰공고가 저장되었습니다. (${itemCount}개 항목)`,
+            filename: filename,
+            timestamp: timestamp,
+            displayName: now.toLocaleString('ko-KR'),
+            savedCount: itemCount
+        });
+        
+        console.log(`선택 저장 완료: ${filename} → ${itemCount}개 항목`);
+        
+    } catch (error) {
+        console.error('선택 저장 오류:', error);
+        res.status(500).json({
+            success: false,
+            message: '선택 저장 중 오류가 발생했습니다.',
+            error: error.message
+        });
+    }
+});
+
+// 저장된 선택 불러오기
+app.post('/api/load-selection/:filename', async (req, res) => {
+    try {
+        const filename = req.params.filename;
+        const savedData = await loadData(filename);
+        
+        if (!savedData) {
+            return res.status(404).json({
+                success: false,
+                message: '저장된 파일을 찾을 수 없습니다.'
+            });
+        }
+        
+        // 현재 선택에 덮어쓰기
+        await saveData('selected-bids.json', savedData);
+        
+        const itemCount = Object.keys(savedData).length;
+        
+        res.json({
+            success: true,
+            message: `저장된 선택이 불러와졌습니다. (${itemCount}개 항목)`,
+            selectedBids: savedData,
+            loadedCount: itemCount
+        });
+        
+        console.log(`선택 불러오기 완료: ${filename} → ${itemCount}개 항목`);
+        
+    } catch (error) {
+        console.error('선택 불러오기 오류:', error);
+        res.status(500).json({
+            success: false,
+            message: '선택 불러오기 중 오류가 발생했습니다.',
+            error: error.message
+        });
+    }
+});
+
+// 저장된 선택 삭제
+app.delete('/api/saved-selections/:filename', async (req, res) => {
+    try {
+        const fs = require('fs');
+        const filename = req.params.filename;
+        const dataDir = path.join(__dirname, 'data');
+        const filePath = path.join(dataDir, filename);
+        
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({
+                success: false,
+                message: '저장된 파일을 찾을 수 없습니다.'
+            });
+        }
+        
+        fs.unlinkSync(filePath);
+        
+        res.json({
+            success: true,
+            message: '저장된 선택이 삭제되었습니다.'
+        });
+        
+        console.log(`저장된 선택 삭제 완료: ${filename}`);
+        
+    } catch (error) {
+        console.error('저장된 선택 삭제 오류:', error);
+        res.status(500).json({
+            success: false,
+            message: '삭제 중 오류가 발생했습니다.',
+            error: error.message
+        });
+    }
+});
+
 // 자동 업데이트 스케줄러 초기화
 function initializeScheduler() {
     // 매일 09:00, 17:00에 자동 업데이트

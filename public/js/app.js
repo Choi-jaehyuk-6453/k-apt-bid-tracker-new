@@ -53,6 +53,11 @@ class BidTracker {
         document.getElementById('resetSelectedBidsBtn').addEventListener('click', () => {
             this.resetSelectedBids();
         });
+
+        // 저장 버튼 이벤트
+        document.getElementById('saveSelectionBtn').addEventListener('click', () => {
+            this.saveCurrentSelection();
+        });
     }
 
     async loadData() {
@@ -451,6 +456,7 @@ class BidTracker {
 
     getDeadlineBadge(deadline) {
         const days = this.getDaysUntilDeadline(deadline);
+        if (days < 0) return '<span class="badge bg-secondary ms-1">마감</span>'; // 마감된 경우
         if (days <= 1) return '<span class="badge bg-danger ms-1">긴급</span>';
         if (days <= 3) return '<span class="badge bg-warning ms-1">임박</span>';
         return '';
@@ -1052,7 +1058,145 @@ class BidTracker {
             this.updateSelectedBidsDisplay();
         }
     }
+
+    // 현재 선택 저장
+    async saveCurrentSelection() {
+        try {
+            if (this.selectedBids.size === 0) {
+                this.showError('저장할 선택된 입찰공고가 없습니다.');
+                return;
+            }
+
+            const selectedBidsData = {};
+            this.selectedBids.forEach((value, key) => {
+                selectedBidsData[key] = value;
+            });
+
+            const response = await fetch('/api/save-selection', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ selectedBids: selectedBidsData })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.showSuccess(`${data.displayName}으로 저장되었습니다. (${data.savedCount}개 항목)`);
+            } else {
+                this.showError(data.message);
+            }
+
+        } catch (error) {
+            console.error('선택 저장 오류:', error);
+            this.showError('선택 저장 중 오류가 발생했습니다.');
+        }
+    }
+
+    // 저장된 목록 불러오기 모달 표시
+    async showLoadModal() {
+        try {
+            const modal = new bootstrap.Modal(document.getElementById('loadModal'));
+            modal.show();
+
+            // 저장된 목록 불러오기
+            const response = await fetch('/api/saved-selections');
+            const data = await response.json();
+
+            const savedList = document.getElementById('savedSelectionsList');
+
+            if (data.success && data.savedSelections.length > 0) {
+                savedList.innerHTML = data.savedSelections.map(selection => `
+                    <div class="saved-item p-3 border rounded mb-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${selection.displayName}</strong><br>
+                                <small class="text-muted">${(selection.size / 1024).toFixed(1)} KB</small>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-primary btn-sm" onclick="loadSelection('${selection.filename}')">
+                                    불러오기
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" onclick="deleteSelection('${selection.filename}')">
+                                    삭제
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                savedList.innerHTML = '<div class="text-center text-muted">저장된 선택이 없습니다.</div>';
+            }
+
+        } catch (error) {
+            console.error('저장된 목록 로드 오류:', error);
+            document.getElementById('savedSelectionsList').innerHTML = 
+                '<div class="text-center text-danger">저장된 목록을 불러올 수 없습니다.</div>';
+        }
+    }
+
+    // 저장된 선택 불러오기
+    async loadSelection(filename) {
+        try {
+            const response = await fetch(`/api/load-selection/${filename}`, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // 모달 닫기
+                bootstrap.Modal.getInstance(document.getElementById('loadModal')).hide();
+
+                // 성공 메시지
+                this.showSuccess(data.message);
+
+                // 데이터 다시 로드
+                await this.loadSelectedBids();
+
+            } else {
+                this.showError(data.message);
+            }
+
+        } catch (error) {
+            console.error('선택 불러오기 오류:', error);
+            this.showError('선택 불러오기 중 오류가 발생했습니다.');
+        }
+    }
+
+    // 저장된 선택 삭제
+    async deleteSelection(filename) {
+        try {
+            if (!confirm('정말로 이 저장된 선택을 삭제하시겠습니까?')) {
+                return;
+            }
+
+            const response = await fetch(`/api/saved-selections/${filename}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.showSuccess('저장된 선택이 삭제되었습니다.');
+                
+                // 목록 다시 불러오기
+                await showLoadModal();
+
+            } else {
+                this.showError(data.message);
+            }
+
+        } catch (error) {
+            console.error('선택 삭제 오류:', error);
+            this.showError('선택 삭제 중 오류가 발생했습니다.');
+        }
+    }
 }
 
 // Initialize the application
 const bidTracker = new BidTracker(); 
+
+// 전역 함수로 등록 (HTML onclick에서 호출하기 위해)
+window.showLoadModal = () => bidTracker.showLoadModal();
+window.loadSelection = (filename) => bidTracker.loadSelection(filename);
+window.deleteSelection = (filename) => bidTracker.deleteSelection(filename); 
