@@ -178,6 +178,44 @@ app.get('/api/status', (req, res) => {
     });
 });
 
+// 선택된 입찰공고 저장 API
+app.post('/api/selected-bids', async (req, res) => {
+    try {
+        const { selectedBids } = req.body;
+        await saveData('selected-bids.json', selectedBids);
+        
+        res.json({
+            success: true,
+            message: '선택된 입찰공고가 저장되었습니다.'
+        });
+    } catch (error) {
+        console.error('Selected bids save error:', error);
+        res.status(500).json({
+            success: false,
+            message: '선택된 입찰공고 저장 중 오류가 발생했습니다.',
+            error: error.message
+        });
+    }
+});
+
+// 선택된 입찰공고 불러오기 API
+app.get('/api/selected-bids', async (req, res) => {
+    try {
+        const selectedBids = await loadData('selected-bids.json') || {};
+        res.json({
+            success: true,
+            selectedBids: selectedBids
+        });
+    } catch (error) {
+        console.error('Selected bids load error:', error);
+        res.status(500).json({
+            success: false,
+            message: '선택된 입찰공고를 불러오는 중 오류가 발생했습니다.',
+            error: error.message
+        });
+    }
+});
+
 // 자동 업데이트 스케줄러 초기화
 function initializeScheduler() {
     // 매일 09:00, 17:00에 자동 업데이트

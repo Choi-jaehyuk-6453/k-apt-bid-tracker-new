@@ -15,7 +15,7 @@ class BidTracker {
     async init() {
         this.bindEvents();
         await this.loadData();
-        this.loadSelectedBids(); // 저장된 선택 정보 로드
+        await this.loadSelectedBids();
         this.updateStats();
         this.applyFilters();
     }
@@ -785,58 +785,120 @@ class BidTracker {
         }
     }
 
-    saveSelectedBids() {
+    async saveSelectedBids() {
         try {
             const selectedBidsData = {};
             this.selectedBids.forEach((value, key) => {
                 selectedBidsData[key] = value;
             });
+            
+            // 서버에 저장
+            const response = await fetch('/api/selected-bids', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ selectedBids: selectedBidsData })
+            });
+            
+            if (!response.ok) {
+                throw new Error('서버 저장 실패');
+            }
+            
+            // 로컬 스토리지에도 백업으로 저장
             localStorage.setItem('selectedBids', JSON.stringify(selectedBidsData));
+            
         } catch (error) {
             console.error('선택 정보 저장 오류:', error);
+            // 서버 저장 실패 시 로컬 스토리지에만 저장
+            const selectedBidsData = {};
+            this.selectedBids.forEach((value, key) => {
+                selectedBidsData[key] = value;
+            });
+            localStorage.setItem('selectedBids', JSON.stringify(selectedBidsData));
+            this.showError('서버 저장에 실패했습니다. 로컬에만 저장됩니다.');
         }
     }
 
-    loadSelectedBids() {
+    async loadSelectedBids() {
+        let serverData = null;
+        let localData = null;
+        
         try {
-            const savedData = localStorage.getItem('selectedBids');
-            if (savedData) {
-                const selectedBidsData = JSON.parse(savedData);
-                this.selectedBids = new Map();
-                
-                // 호환성 처리: 새로운 필드가 없는 기존 데이터 업데이트
-                Object.entries(selectedBidsData).forEach(([bidId, bidData]) => {
-                    const updatedBidData = {
-                        ...bidData,
-                        bidTime: bidData.bidTime || '',
-                        submissionMethod: bidData.submissionMethod || '전자',
-                        siteVisit: {
-                            enabled: false,
-                            date: '',
-                            startTime: '',
-                            endTime: '',
-                            ...bidData.siteVisit
-                        },
-                        sitePT: {
-                            enabled: false,
-                            date: '',
-                            time: '',
-                            ...bidData.sitePT
-                        }
-                    };
-                    this.selectedBids.set(bidId, updatedBidData);
-                });
-                
-                // 체크 순서 복원 (저장된 데이터가 없으면 기본 순서로 설정)
-                this.checkOrder = Object.keys(selectedBidsData);
-                
-                this.updateSelectedBidsDisplay();
+            // 1. 서버에서 데이터 불러오기 시도
+            const response = await fetch('/api/selected-bids');
+            const data = await response.json();
+            
+            if (data.success) {
+                serverData = data.selectedBids;
             }
         } catch (error) {
-            console.error('선택 정보 로드 오류:', error);
-            this.selectedBids = new Map();
-            this.checkOrder = [];
+            console.error('서버에서 선택 정보 로드 실패:', error);
         }
+        
+        try {
+            // 2. 로컬 스토리지에서 데이터 불러오기
+            const savedData = localStorage.getItem('selectedBids');
+            if (savedData) {
+                localData = JSON.parse(savedData);
+            }
+        } catch (error) {
+            console.error('로컬 선택 정보 로드 실패:', error);
+        }
+        
+        // 3. 마이그레이션 로직 (로컬 → 서버)
+        if (localData && Object.keys(localData).length > 0) {
+            if (!serverData || Object.keys(serverData).length === 0) {
+                console.log('로컬 스토리지 데이터를 서버로 마이그레이션 중...');
+                try {
+                    const migrateResponse = await fetch('/api/selected-bids', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ selectedBids: localData })
+                    });
+                    
+                    if (migrateResponse.ok) {
+                        console.log('마이그레이션 완료: 로컬 데이터가 서버로 이전되었습니다.');
+                        serverData = localData;
+                        this.showSuccess('기존 선택 정보가 서버로 이전되었습니다.');
+                    }
+                } catch (error) {
+                    console.error('마이그레이션 중 오류:', error);
+                }
+            }
+        }
+        
+        // 4. 최종 데이터 적용 (서버 데이터 우선)
+        const finalData = serverData || localData || {};
+        
+        this.selectedBids = new Map();
+        
+        Object.entries(finalData).forEach(([bidId, bidData]) => {
+            const updatedBidData = {
+                ...bidData,
+                bidTime: bidData.bidTime || '',
+                submissionMethod: bidData.submissionMethod || '전자',
+                siteVisit: {
+                    enabled: false,
+                    date: '',
+                    startTime: '',
+                    endTime: '',
+                    ...bidData.siteVisit
+                },
+                sitePT: {
+                    enabled: false,
+                    date: '',
+                    time: '',
+                    ...bidData.sitePT
+                }
+            };
+            this.selectedBids.set(bidId, updatedBidData);
+        });
+        
+        this.checkOrder = Object.keys(finalData);
+        this.updateSelectedBidsDisplay();
     }
 
     generateTimeOptions(selectedTime) {
