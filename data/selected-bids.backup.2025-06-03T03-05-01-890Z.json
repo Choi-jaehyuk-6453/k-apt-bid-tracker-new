@@ -1,0 +1,245 @@
+{
+  "46": {
+    "id": "46",
+    "type": "K-APT",
+    "method": "적격심사",
+    "title": "[경기] 경비용역사업자 선정 입찰공고(긴급)",
+    "deadline": "2025-06-04 08:00:00",
+    "status": "신규공고",
+    "aptName": "옥정중앙역S-클래스센텀시티3블럭",
+    "postDate": "2025-05-29 07:46:23",
+    "region": "경기",
+    "category": "경비",
+    "detailLink": "",
+    "scrapedAt": "2025-06-01T08:00:00.382Z",
+    "bidTime": "",
+    "submissionMethod": "전자",
+    "siteVisit": {
+      "enabled": false,
+      "date": "",
+      "startTime": "",
+      "endTime": ""
+    },
+    "sitePT": {
+      "enabled": false,
+      "date": "",
+      "time": ""
+    }
+  },
+  "47": {
+    "id": "47",
+    "type": "K-APT",
+    "method": "적격심사",
+    "title": "[서울] 경비용역사업자 선정 입찰공고",
+    "deadline": "2025-06-10 08:00:00",
+    "status": "신규공고",
+    "aptName": "상계극동늘푸른",
+    "postDate": "2025-05-30 02:10:49",
+    "region": "서울",
+    "category": "경비",
+    "detailLink": "",
+    "scrapedAt": "2025-06-01T08:00:00.382Z",
+    "bidTime": "",
+    "submissionMethod": "전자",
+    "siteVisit": {
+      "enabled": false,
+      "date": "",
+      "startTime": "",
+      "endTime": ""
+    },
+    "sitePT": {
+      "enabled": false,
+      "date": "",
+      "time": ""
+    }
+  },
+  "48": {
+    "id": "48",
+    "type": "K-APT",
+    "method": "최저 낙찰",
+    "title": "[인천] 경비용역업체 입찰공고",
+    "deadline": "2025-06-10 08:00:00",
+    "status": "신규공고",
+    "aptName": "향촌휴먼시아2단지아파트",
+    "postDate": "2025-05-30 05:19:13",
+    "region": "인천",
+    "category": "경비",
+    "detailLink": "",
+    "scrapedAt": "2025-06-01T08:00:00.382Z",
+    "bidTime": "",
+    "submissionMethod": "전자",
+    "siteVisit": {
+      "enabled": false,
+      "date": "",
+      "startTime": "",
+      "endTime": ""
+    },
+    "sitePT": {
+      "enabled": false,
+      "date": "",
+      "time": ""
+    }
+  },
+  "49": {
+    "id": "49",
+    "type": "K-APT",
+    "method": "적격심사",
+    "title": "[경기] 경비용역 입찰공고",
+    "deadline": "2025-06-10 08:00:00",
+    "status": "신규공고",
+    "aptName": "수정한양",
+    "postDate": "2025-05-30 05:32:13",
+    "region": "경기",
+    "category": "경비",
+    "detailLink": "",
+    "scrapedAt": "2025-06-01T08:00:00.382Z",
+    "bidTime": "",
+    "submissionMethod": "전자",
+    "siteVisit": {
+      "enabled": false,
+      "date": "",
+      "startTime": "",
+      "endTime": ""
+    },
+    "sitePT": {
+      "enabled": false,
+      "date": "",
+      "time": ""
+    }
+  },
+  "50": {
+    "id": "50",
+    "type": "K-APT",
+    "method": "적격심사",
+    "title": "[충북] 경비용역사업자선정 입찰공고",
+    "deadline": "2025-06-11 08:00:00",
+    "status": "신규공고",
+    "aptName": "청주동남1단지아파트",
+    "postDate": "2025-05-30 05:35:43",
+    "region": "충북",
+    "category": "경비",
+    "detailLink": "",
+    "scrapedAt": "2025-06-01T08:00:00.382Z",
+    "bidTime": "",
+    "submissionMethod": "전자",
+    "siteVisit": {
+      "enabled": false,
+      "date": "",
+      "startTime": "",
+      "endTime": ""
+    },
+    "sitePT": {
+      "enabled": false,
+      "date": "",
+      "time": ""
+    }
+  },
+  "51": {
+    "id": "51",
+    "type": "K-APT",
+    "method": "최저 낙찰",
+    "title": "[경기] 경비용역사업자 선정",
+    "deadline": "2025-06-11 08:00:00",
+    "status": "신규공고",
+    "aptName": "고양지축LH4단지",
+    "postDate": "2025-05-30 05:58:22",
+    "region": "경기",
+    "category": "경비",
+    "detailLink": "",
+    "scrapedAt": "2025-06-01T08:00:00.381Z",
+    "bidTime": "",
+    "submissionMethod": "전자",
+    "siteVisit": {
+      "enabled": false,
+      "date": "",
+      "startTime": "",
+      "endTime": ""
+    },
+    "sitePT": {
+      "enabled": false,
+      "date": "",
+      "time": ""
+    }
+  },
+  "52": {
+    "id": "52",
+    "type": "KG2B전자입찰",
+    "method": "적격심사",
+    "title": "[경기] 경비용역업체 선정 입찰 공고",
+    "deadline": "2025-06-16 08:00:00",
+    "status": "신규공고",
+    "aptName": "동탄역 신안인스빌리베라",
+    "postDate": "2025-05-30 06:13:44",
+    "region": "경기",
+    "category": "경비",
+    "detailLink": "",
+    "scrapedAt": "2025-06-01T08:00:00.381Z",
+    "bidTime": "",
+    "submissionMethod": "전자",
+    "siteVisit": {
+      "enabled": false,
+      "date": "",
+      "startTime": "",
+      "endTime": ""
+    },
+    "sitePT": {
+      "enabled": false,
+      "date": "",
+      "time": ""
+    }
+  },
+  "53": {
+    "id": "53",
+    "type": "K-APT",
+    "method": "적격심사",
+    "title": "[경기] 경비 용역사업자 선정",
+    "deadline": "2025-06-12 08:00:00",
+    "status": "신규공고",
+    "aptName": "만현마을두산위브",
+    "postDate": "2025-05-30 06:52:45",
+    "region": "경기",
+    "category": "경비",
+    "detailLink": "",
+    "scrapedAt": "2025-06-01T08:00:00.381Z",
+    "bidTime": "",
+    "submissionMethod": "전자",
+    "siteVisit": {
+      "enabled": false,
+      "date": "",
+      "startTime": "",
+      "endTime": ""
+    },
+    "sitePT": {
+      "enabled": false,
+      "date": "",
+      "time": ""
+    }
+  },
+  "54": {
+    "id": "54",
+    "type": "K-APT",
+    "method": "적격심사",
+    "title": "[경기] 경비용역업체 선정 입찰공고",
+    "deadline": "2025-06-11 08:00:00",
+    "status": "신규공고",
+    "aptName": "양주백석1단지",
+    "postDate": "2025-05-30 07:26:45",
+    "region": "경기",
+    "category": "경비",
+    "detailLink": "",
+    "scrapedAt": "2025-06-01T08:00:00.380Z",
+    "bidTime": "",
+    "submissionMethod": "전자",
+    "siteVisit": {
+      "enabled": false,
+      "date": "",
+      "startTime": "",
+      "endTime": ""
+    },
+    "sitePT": {
+      "enabled": false,
+      "date": "",
+      "time": ""
+    }
+  }
+}
