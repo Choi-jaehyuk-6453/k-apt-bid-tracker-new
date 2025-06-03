@@ -9,6 +9,10 @@ class BidTracker {
         this.currentPage = 1;
         this.itemsPerPage = 10;
         
+        // 선택된 입찰목록 페이지네이션
+        this.selectedBidsCurrentPage = 1;
+        this.selectedBidsItemsPerPage = 10;
+        
         this.init();
     }
 
@@ -641,10 +645,17 @@ class BidTracker {
             return;
         }
 
+        // 페이지네이션 계산
+        const totalItems = this.checkOrder.length;
+        const totalPages = Math.ceil(totalItems / this.selectedBidsItemsPerPage);
+        const startIndex = (this.selectedBidsCurrentPage - 1) * this.selectedBidsItemsPerPage;
+        const endIndex = startIndex + this.selectedBidsItemsPerPage;
+        const pageItems = this.checkOrder.slice(startIndex, endIndex);
+
         let html = '';
         
-        // 체크 순서대로 표시 (최근 체크된 것이 위에)
-        this.checkOrder.forEach(bidId => {
+        // 체크 순서대로 표시 (페이지네이션 적용)
+        pageItems.forEach(bidId => {
             if (this.selectedBids.has(bidId)) {
                 const bidData = this.selectedBids.get(bidId);
                 html += `
@@ -652,9 +663,18 @@ class BidTracker {
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-md-4">
-                                    <h6 class="card-title">${bidData.aptName} <span class="badge ${this.getMethodBadgeClass(bidData.method)}">${bidData.method}</span></h6>
-                                    <p class="card-text small text-muted">${bidData.title}</p>
-                                    <p class="card-text"><small class="text-muted">마감일: ${this.formatDateOnly(bidData.deadline)}</small></p>
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h6 class="card-title">${bidData.aptName} <span class="badge ${this.getMethodBadgeClass(bidData.method)}">${bidData.method}</span></h6>
+                                            <p class="card-text small text-muted">${bidData.title}</p>
+                                            <p class="card-text"><small class="text-muted">마감일: ${this.formatDateOnly(bidData.deadline)}</small></p>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                onclick="bidTracker.removeSelectedBid('${bidId}')" 
+                                                title="선택 해제">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="col-md-2">
                                     <div class="mb-2">
@@ -757,6 +777,11 @@ class BidTracker {
                 `;
             }
         });
+        
+        // 페이지네이션 HTML 추가
+        if (totalPages > 1) {
+            html += this.renderSelectedBidsPagination(totalPages);
+        }
         
         container.innerHTML = html;
     }
@@ -935,6 +960,96 @@ class BidTracker {
             this.saveSelectedBids();
             this.updateSelectedBidsDisplay();
             console.log(`제거된 선택 공고: ${toRemove.length}건`);
+        }
+    }
+
+    // 개별 선택된 입찰공고 삭제
+    removeSelectedBid(bidId) {
+        if (this.selectedBids.has(bidId)) {
+            this.selectedBids.delete(bidId);
+            
+            // 체크 순서에서도 제거
+            this.checkOrder = this.checkOrder.filter(id => id !== bidId);
+            
+            // 현재 페이지가 비어있으면 이전 페이지로 이동
+            const totalPages = Math.ceil(this.checkOrder.length / this.selectedBidsItemsPerPage);
+            if (this.selectedBidsCurrentPage > totalPages && totalPages > 0) {
+                this.selectedBidsCurrentPage = totalPages;
+            } else if (this.checkOrder.length === 0) {
+                this.selectedBidsCurrentPage = 1;
+            }
+            
+            // 메인 테이블의 체크박스도 해제
+            const checkbox = document.querySelector(`input[data-bid-id="${bidId}"]`);
+            if (checkbox) {
+                checkbox.checked = false;
+            }
+            
+            this.updateSelectedBidsDisplay();
+            this.saveSelectedBids();
+            this.showSuccess('선택된 입찰공고가 제거되었습니다.');
+        }
+    }
+
+    // 선택된 입찰목록 페이지네이션 렌더링
+    renderSelectedBidsPagination(totalPages) {
+        let paginationHTML = `
+            <div class="d-flex justify-content-center mt-3">
+                <nav aria-label="선택된 입찰목록 페이지네이션">
+                    <ul class="pagination pagination-sm">
+        `;
+
+        // Previous button
+        paginationHTML += `
+            <li class="page-item ${this.selectedBidsCurrentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="bidTracker.goToSelectedBidsPage(${this.selectedBidsCurrentPage - 1})">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+        `;
+
+        // Page numbers
+        const startPage = Math.max(1, this.selectedBidsCurrentPage - 2);
+        const endPage = Math.min(totalPages, this.selectedBidsCurrentPage + 2);
+
+        for (let i = startPage; i <= endPage; i++) {
+            paginationHTML += `
+                <li class="page-item ${i === this.selectedBidsCurrentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="bidTracker.goToSelectedBidsPage(${i})">${i}</a>
+                </li>
+            `;
+        }
+
+        // Next button
+        paginationHTML += `
+            <li class="page-item ${this.selectedBidsCurrentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="bidTracker.goToSelectedBidsPage(${this.selectedBidsCurrentPage + 1})">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+        `;
+
+        paginationHTML += `
+                    </ul>
+                </nav>
+            </div>
+            <div class="text-center mt-2">
+                <small class="text-muted">
+                    ${this.selectedBidsCurrentPage} / ${totalPages} 페이지 
+                    (총 ${this.selectedBids.size}건)
+                </small>
+            </div>
+        `;
+
+        return paginationHTML;
+    }
+
+    // 선택된 입찰목록 페이지 이동
+    goToSelectedBidsPage(page) {
+        const totalPages = Math.ceil(this.checkOrder.length / this.selectedBidsItemsPerPage);
+        if (page >= 1 && page <= totalPages) {
+            this.selectedBidsCurrentPage = page;
+            this.updateSelectedBidsDisplay();
         }
     }
 }
