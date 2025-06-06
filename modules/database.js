@@ -8,10 +8,37 @@ class Database {
 
     async connect() {
         if (!this.client) {
-            this.client = new MongoClient(process.env.MONGODB_URI);
-            await this.client.connect();
-            this.db = this.client.db('kapt-bids');
-            console.log('MongoDB 연결 성공');
+            console.log('🔌 MongoDB 연결 시도 중...');
+            console.log('MONGODB_URI 존재:', !!process.env.MONGODB_URI);
+            console.log('MONGODB_URI 앞 30자:', process.env.MONGODB_URI ? process.env.MONGODB_URI.substring(0, 30) + '...' : 'undefined');
+            
+            if (!process.env.MONGODB_URI) {
+                throw new Error('MONGODB_URI 환경 변수가 설정되지 않았습니다.');
+            }
+            
+            try {
+                this.client = new MongoClient(process.env.MONGODB_URI, {
+                    connectTimeoutMS: 10000, // 10초 타임아웃
+                    serverSelectionTimeoutMS: 5000, // 5초 서버 선택 타임아웃
+                });
+                
+                console.log('MongoDB 클라이언트 생성 완료, 연결 시작...');
+                await this.client.connect();
+                console.log('MongoDB 연결 완료, 데이터베이스 선택...');
+                
+                this.db = this.client.db('kapt-bids');
+                console.log('✅ MongoDB 연결 성공');
+            } catch (error) {
+                console.error('❌ MongoDB 연결 실패 상세 정보:');
+                console.error('에러 이름:', error.name);
+                console.error('에러 메시지:', error.message);
+                console.error('에러 코드:', error.code);
+                console.error('전체 에러:', error);
+                
+                this.client = null;
+                this.db = null;
+                throw error;
+            }
         }
         return this.db;
     }
