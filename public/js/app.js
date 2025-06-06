@@ -22,6 +22,7 @@ class BidTracker {
         await this.loadSelectedBids();
         this.updateStats();
         this.applyFilters();
+        this.startKeepAlive(); // Keep-alive 시작
     }
 
     bindEvents() {
@@ -1205,6 +1206,18 @@ class BidTracker {
             console.error('선택 삭제 오류:', error);
             this.showError('선택 삭제 중 오류가 발생했습니다.');
         }
+    }
+
+    startKeepAlive() {
+        // 12분마다 서버에 상태 확인 요청 (15분 제한보다 짧게)
+        setInterval(() => {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => console.log('Keep-alive ping:', data.status))
+                .catch(() => {}); // 에러 무시
+        }, 12 * 60 * 1000); // 12분
+        
+        console.log('Keep-alive 기능이 시작되었습니다. (12분 간격)');
     }
 }
 

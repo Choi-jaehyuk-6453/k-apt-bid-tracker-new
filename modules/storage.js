@@ -1,6 +1,9 @@
 const fs = require('fs').promises;
 const path = require('path');
 
+// MongoDB 모듈 추가
+const database = require('./database');
+
 // 데이터 디렉토리 경로
 const DATA_DIR = path.join(__dirname, '../data');
 
@@ -28,6 +31,14 @@ async function ensureDataDir() {
  */
 async function saveData(filename, data, createBackup = true) {
     try {
+        // MongoDB 사용 시 (환경 변수가 있으면)
+        if (process.env.MONGODB_URI) {
+            const collection = filename.replace('.json', '');
+            await database.saveData(collection, data);
+            return true;
+        }
+        
+        // 기존 파일 시스템 코드 유지 (로컬 개발용)
         await ensureDataDir();
         
         const filepath = path.join(DATA_DIR, filename);
@@ -57,6 +68,13 @@ async function saveData(filename, data, createBackup = true) {
  */
 async function loadData(filename) {
     try {
+        // MongoDB 사용 시
+        if (process.env.MONGODB_URI) {
+            const collection = filename.replace('.json', '');
+            return await database.loadData(collection);
+        }
+        
+        // 기존 파일 시스템 코드 유지
         const filepath = path.join(DATA_DIR, filename);
         
         // 파일 존재 여부 확인
