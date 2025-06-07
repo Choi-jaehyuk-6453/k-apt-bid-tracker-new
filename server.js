@@ -269,7 +269,9 @@ app.get('/api/saved-selections', async (req, res) => {
                                 throw new Error('Invalid date');
                             }
                             
-                            console.log(`파싱 성공: ${parsedDate.toISOString()}`);
+                            // 이미 한국 시간으로 저장된 것이므로 추가 변환 불필요
+                            console.log(`파싱 성공: ${parsedDate.toISOString()} (한국 시간 기준)`);
+                            console.log(`한국 시간 표시: ${parsedDate.toLocaleString('ko-KR')}`);
                         } catch (e) {
                             console.warn(`타임스탬프 파싱 실패: ${timestamp}, 에러: ${e.message}`);
                             parsedDate = new Date();
@@ -347,11 +349,28 @@ app.post('/api/save-selection', async (req, res) => {
             });
         }
         
-        // 고유한 타임스탬프 생성 (밀리초 + 랜덤 요소)
+        // 한국 시간 기준으로 고유한 타임스탬프 생성
         const now = new Date();
+        
+        // 한국 시간 (Asia/Seoul) 기준으로 Date 생성
+        const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
         const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-        const timestamp = now.toISOString().replace(/[:.]/g, '-') + '-' + randomSuffix;
+        
+        // 한국 시간을 수동으로 ISO 형식으로 포맷팅
+        const year = koreaTime.getFullYear();
+        const month = String(koreaTime.getMonth() + 1).padStart(2, '0');
+        const day = String(koreaTime.getDate()).padStart(2, '0');
+        const hour = String(koreaTime.getHours()).padStart(2, '0');
+        const minute = String(koreaTime.getMinutes()).padStart(2, '0');
+        const second = String(koreaTime.getSeconds()).padStart(2, '0');
+        const millisecond = String(koreaTime.getMilliseconds()).padStart(3, '0');
+        
+        const timestamp = `${year}-${month}-${day}T${hour}-${minute}-${second}-${millisecond}Z-${randomSuffix}`;
         const filename = `saved-selection-${timestamp}.json`;
+        
+        console.log(`서버 현재 시간: ${now.toISOString()}`);
+        console.log(`한국 현재 시간: ${now.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'})}`);
+        console.log(`생성된 타임스탬프: ${timestamp}`);
         
         console.log(`저장 시작: ${filename}, 항목 수: ${Object.keys(selectedBids).length}`);
         
@@ -364,7 +383,7 @@ app.post('/api/save-selection', async (req, res) => {
             message: `선택된 입찰공고가 저장되었습니다. (${itemCount}개 항목)`,
             filename: filename,
             timestamp: timestamp,
-            displayName: now.toLocaleString('ko-KR'),
+            displayName: now.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}),
             savedCount: itemCount
         });
         
