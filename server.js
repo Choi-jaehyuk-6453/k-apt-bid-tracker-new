@@ -227,29 +227,51 @@ app.get('/api/saved-selections', async (req, res) => {
                 const database = require('./modules/database');
                 const db = await database.connect();
                 
-                // saved-selection으로 시작하는 컬렉션들 찾기
+                // saved-selection으로 시작하는 컬렉션들 찾기 (백업 제외)
                 const collections = await db.listCollections().toArray();
                 const savedSelections = collections
-                    .filter(col => col.name.startsWith('saved-selection-'))
+                    .filter(col => col.name.startsWith('saved-selection-') && !col.name.endsWith('_backup'))
                     .map(col => {
                         const timestamp = col.name.replace('saved-selection-', '');
-                        // ISO 타임스탬프 파싱 (YYYY-MM-DDTHH-MM-SS-sssZ 형식)
+                        console.log(`타임스탬프 파싱 시도: ${timestamp}`);
+                        
+                        // ISO 타임스탬프 파싱 (2025-06-07T08-34-57-377Z 형식)
                         let parsedDate;
                         try {
-                            const isoString = timestamp.replace(/-/g, (match, offset) => {
-                                // 처음 두 개의 '-'는 날짜 구분자로 유지, 나머지는 ':'으로 변경
-                                const dashCount = timestamp.substring(0, offset).split('-').length - 1;
-                                if (dashCount < 2) return '-';
-                                if (dashCount === 2) return 'T';
-                                if (dashCount === 5) return '.';
-                                return ':';
-                            });
+                            // 2025-06-07T08-34-57-377Z-123 형태를 처리
+                            let isoString = timestamp;
+                            
+                            // 마지막에 추가된 랜덤 접미사 제거 (마지막 하이픈 이후)
+                            const lastDashIndex = isoString.lastIndexOf('-');
+                            const zIndex = isoString.indexOf('Z');
+                            if (lastDashIndex > zIndex) {
+                                isoString = isoString.substring(0, lastDashIndex);
+                            }
+                            
+                            // YYYY-MM-DDTHH-MM-SS-sssZ -> YYYY-MM-DDTHH:MM:SS.sssZ
+                            const tIndex = isoString.indexOf('T');
+                            if (tIndex !== -1) {
+                                const timePart = isoString.substring(tIndex + 1);
+                                const datePart = isoString.substring(0, tIndex + 1);
+                                
+                                // 시간 부분에서 하이픈을 콜론과 점으로 변경
+                                // HH-MM-SS-sssZ -> HH:MM:SS.sssZ
+                                const timeConverted = timePart
+                                    .replace(/^(\d{2})-(\d{2})-(\d{2})-(\d{3})(.*)$/, '$1:$2:$3.$4$5');
+                                
+                                isoString = datePart + timeConverted;
+                            }
+                            
+                            console.log(`변환된 ISO 문자열: ${isoString}`);
                             parsedDate = new Date(isoString);
+                            
                             if (isNaN(parsedDate.getTime())) {
                                 throw new Error('Invalid date');
                             }
+                            
+                            console.log(`파싱 성공: ${parsedDate.toISOString()}`);
                         } catch (e) {
-                            console.warn(`타임스탬프 파싱 실패: ${timestamp}, 현재 시간 사용`);
+                            console.warn(`타임스탬프 파싱 실패: ${timestamp}, 에러: ${e.message}`);
                             parsedDate = new Date();
                         }
                         
@@ -317,9 +339,21 @@ app.get('/api/saved-selections', async (req, res) => {
 app.post('/api/save-selection', async (req, res) => {
     try {
         const { selectedBids } = req.body;
+        
+        if (!selectedBids || Object.keys(selectedBids).length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: '저장할 선택된 입찰공고가 없습니다.'
+            });
+        }
+        
+        // 고유한 타임스탬프 생성 (밀리초 + 랜덤 요소)
         const now = new Date();
-        const timestamp = now.toISOString().replace(/[:.]/g, '-');
+        const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        const timestamp = now.toISOString().replace(/[:.]/g, '-') + '-' + randomSuffix;
         const filename = `saved-selection-${timestamp}.json`;
+        
+        console.log(`저장 시작: ${filename}, 항목 수: ${Object.keys(selectedBids).length}`);
         
         await saveData(filename, selectedBids);
         
@@ -403,9 +437,9 @@ app.delete('/api/saved-selections/:filename', async (req, res) => {
                 const db = await database.connect();
                 const collectionName = filename.replace('.json', '');
                 
-                // 컬렉션 존재 여부 확인
+                // 컬렉션 존재 여부 확인 (백업이 아닌 실제 컬렉션만)
                 const collections = await db.listCollections({ name: collectionName }).toArray();
-                if (collections.length === 0) {
+                if (collections.length === 0 || collectionName.endsWith('_backup')) {
                     return res.status(404).json({
                         success: false,
                         message: '저장된 파일을 찾을 수 없습니다.'
