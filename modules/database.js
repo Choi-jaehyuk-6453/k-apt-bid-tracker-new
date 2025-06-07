@@ -46,6 +46,9 @@ class Database {
     async saveData(collection, data) {
         const db = await this.connect();
         
+        console.log(`MongoDB 저장 시작: ${collection}`);
+        console.log(`저장할 데이터 타입: ${typeof data}, 키 개수: ${typeof data === 'object' ? Object.keys(data).length : 'N/A'}`);
+        
         // 백업 생성 (최근 5개만 유지)
         const backups = await db.collection(`${collection}_backup`)
             .find()
@@ -64,19 +67,23 @@ class Database {
         });
         
         // 현재 데이터 저장/업데이트
-        await db.collection(collection).replaceOne(
+        const result = await db.collection(collection).replaceOne(
             { _id: 'current' },
             { _id: 'current', data: data, updatedAt: new Date() },
             { upsert: true }
         );
         
-        console.log(`MongoDB에 데이터 저장 완료: ${collection}`);
+        console.log(`MongoDB에 데이터 저장 완료: ${collection}, 업데이트된 문서: ${result.modifiedCount || result.upsertedCount}`);
     }
 
     async loadData(collection) {
         const db = await this.connect();
         const result = await db.collection(collection).findOne({ _id: 'current' });
         console.log(`MongoDB에서 데이터 로드: ${collection}`);
+        console.log(`로드 결과:`, result ? '데이터 있음' : '데이터 없음');
+        if (result && result.data) {
+            console.log(`데이터 타입: ${typeof result.data}, 키 개수: ${typeof result.data === 'object' ? Object.keys(result.data).length : 'N/A'}`);
+        }
         return result ? result.data : null;
     }
 

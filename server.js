@@ -221,8 +221,67 @@ app.get('/api/selected-bids', async (req, res) => {
 // 저장소 목록 조회
 app.get('/api/saved-selections', async (req, res) => {
     try {
+        // MongoDB 환경인 경우
+        if (process.env.MONGODB_URI) {
+            try {
+                const database = require('./modules/database');
+                const db = await database.connect();
+                
+                // saved-selection으로 시작하는 컬렉션들 찾기
+                const collections = await db.listCollections().toArray();
+                const savedSelections = collections
+                    .filter(col => col.name.startsWith('saved-selection-'))
+                    .map(col => {
+                        const timestamp = col.name.replace('saved-selection-', '');
+                        // ISO 타임스탬프 파싱 (YYYY-MM-DDTHH-MM-SS-sssZ 형식)
+                        let parsedDate;
+                        try {
+                            const isoString = timestamp.replace(/-/g, (match, offset) => {
+                                // 처음 두 개의 '-'는 날짜 구분자로 유지, 나머지는 ':'으로 변경
+                                const dashCount = timestamp.substring(0, offset).split('-').length - 1;
+                                if (dashCount < 2) return '-';
+                                if (dashCount === 2) return 'T';
+                                if (dashCount === 5) return '.';
+                                return ':';
+                            });
+                            parsedDate = new Date(isoString);
+                            if (isNaN(parsedDate.getTime())) {
+                                throw new Error('Invalid date');
+                            }
+                        } catch (e) {
+                            console.warn(`타임스탬프 파싱 실패: ${timestamp}, 현재 시간 사용`);
+                            parsedDate = new Date();
+                        }
+                        
+                        return {
+                            filename: `${col.name}.json`,
+                            timestamp: timestamp,
+                            date: parsedDate,
+                            size: 0, // MongoDB에서는 크기 정보 없음
+                            displayName: parsedDate.toLocaleString('ko-KR')
+                        };
+                    })
+                    .sort((a, b) => b.date - a.date); // 최신순 정렬
+                
+                return res.json({
+                    success: true,
+                    savedSelections: savedSelections
+                });
+            } catch (mongoError) {
+                console.error('MongoDB 저장소 목록 조회 실패, 파일 시스템으로 폴백:', mongoError);
+            }
+        }
+        
+        // 파일 시스템 사용
         const fs = require('fs');
         const dataDir = path.join(__dirname, 'data');
+        
+        if (!fs.existsSync(dataDir)) {
+            return res.json({
+                success: true,
+                savedSelections: []
+            });
+        }
         
         const savedFiles = fs.readdirSync(dataDir)
             .filter(file => file.startsWith('saved-selection-'))
@@ -291,19 +350,26 @@ app.post('/api/save-selection', async (req, res) => {
 app.post('/api/load-selection/:filename', async (req, res) => {
     try {
         const filename = req.params.filename;
+        console.log(`선택 불러오기 시도: ${filename}`);
+        
+        // MongoDB 환경에서는 .json 제거하여 컬렉션명으로 변환
+        const collectionName = filename.replace('.json', '');
         const savedData = await loadData(filename);
         
         if (!savedData) {
+            console.log(`저장된 데이터를 찾을 수 없습니다: ${filename} (컬렉션: ${collectionName})`);
             return res.status(404).json({
                 success: false,
                 message: '저장된 파일을 찾을 수 없습니다.'
             });
         }
         
+        console.log(`불러온 데이터:`, savedData);
+        
         // 현재 선택에 덮어쓰기
         await saveData('selected-bids.json', savedData);
         
-        const itemCount = Object.keys(savedData).length;
+        const itemCount = savedData && typeof savedData === 'object' ? Object.keys(savedData).length : 0;
         
         res.json({
             success: true,
@@ -327,8 +393,41 @@ app.post('/api/load-selection/:filename', async (req, res) => {
 // 저장된 선택 삭제
 app.delete('/api/saved-selections/:filename', async (req, res) => {
     try {
-        const fs = require('fs');
         const filename = req.params.filename;
+        console.log(`선택 삭제 시도: ${filename}`);
+        
+        // MongoDB 환경인 경우
+        if (process.env.MONGODB_URI) {
+            try {
+                const database = require('./modules/database');
+                const db = await database.connect();
+                const collectionName = filename.replace('.json', '');
+                
+                // 컬렉션 존재 여부 확인
+                const collections = await db.listCollections({ name: collectionName }).toArray();
+                if (collections.length === 0) {
+                    return res.status(404).json({
+                        success: false,
+                        message: '저장된 파일을 찾을 수 없습니다.'
+                    });
+                }
+                
+                // 컬렉션 삭제
+                await db.collection(collectionName).drop();
+                
+                console.log(`MongoDB 컬렉션 삭제 완료: ${collectionName}`);
+                return res.json({
+                    success: true,
+                    message: '저장된 선택이 삭제되었습니다.'
+                });
+                
+            } catch (mongoError) {
+                console.error('MongoDB 삭제 실패, 파일 시스템으로 폴백:', mongoError);
+            }
+        }
+        
+        // 파일 시스템 사용
+        const fs = require('fs');
         const dataDir = path.join(__dirname, 'data');
         const filePath = path.join(dataDir, filename);
         
@@ -346,7 +445,7 @@ app.delete('/api/saved-selections/:filename', async (req, res) => {
             message: '저장된 선택이 삭제되었습니다.'
         });
         
-        console.log(`저장된 선택 삭제 완료: ${filename}`);
+        console.log(`파일 시스템 삭제 완료: ${filename}`);
         
     } catch (error) {
         console.error('저장된 선택 삭제 오류:', error);

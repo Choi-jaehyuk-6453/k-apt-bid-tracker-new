@@ -30,17 +30,26 @@ async function ensureDataDir() {
  * @param {boolean} createBackup - 백업 생성 여부 (기본값: true)
  */
 async function saveData(filename, data, createBackup = true) {
+    console.log(`📝 저장 시작: ${filename}, 데이터 타입: ${typeof data}`);
+    console.log(`MongoDB URI 존재: ${!!process.env.MONGODB_URI}`);
+    
     // MongoDB 우선 시도
     if (process.env.MONGODB_URI) {
         try {
             const collection = filename.replace('.json', '');
+            console.log(`MongoDB 컬렉션명: ${collection}`);
             await database.saveData(collection, data);
             console.log(`✅ MongoDB에 저장 성공: ${filename}`);
             return true;
         } catch (error) {
-            console.error(`❌ MongoDB 저장 실패, 파일 시스템으로 폴백: ${error.message}`);
+            console.error(`❌ MongoDB 저장 실패, 파일 시스템으로 폴백:`);
+            console.error(`에러 이름: ${error.name}`);
+            console.error(`에러 메시지: ${error.message}`);
+            console.error(`에러 스택: ${error.stack}`);
             // MongoDB 실패 시 파일 시스템으로 계속 진행
         }
+    } else {
+        console.log(`MongoDB URI가 설정되지 않아 파일 시스템 사용`);
     }
     
     // 파일 시스템 사용 (MongoDB 없거나 실패 시)
@@ -73,17 +82,26 @@ async function saveData(filename, data, createBackup = true) {
  * @returns {any} 파싱된 JSON 데이터 또는 null (파일이 없는 경우)
  */
 async function loadData(filename) {
+    console.log(`📖 로드 시작: ${filename}`);
+    console.log(`MongoDB URI 존재: ${!!process.env.MONGODB_URI}`);
+    
     // MongoDB 우선 시도
     if (process.env.MONGODB_URI) {
         try {
             const collection = filename.replace('.json', '');
+            console.log(`MongoDB 컬렉션명: ${collection}`);
             const data = await database.loadData(collection);
-            console.log(`✅ MongoDB에서 로드 성공: ${filename}`);
+            console.log(`✅ MongoDB에서 로드 성공: ${filename}, 데이터: ${data ? '있음' : '없음'}`);
             return data;
         } catch (error) {
-            console.error(`❌ MongoDB 로드 실패, 파일 시스템으로 폴백: ${error.message}`);
+            console.error(`❌ MongoDB 로드 실패, 파일 시스템으로 폴백:`);
+            console.error(`에러 이름: ${error.name}`);
+            console.error(`에러 메시지: ${error.message}`);
+            console.error(`에러 스택: ${error.stack}`);
             // MongoDB 실패 시 파일 시스템으로 계속 진행
         }
+    } else {
+        console.log(`MongoDB URI가 설정되지 않아 파일 시스템 사용`);
     }
     
     // 파일 시스템 사용 (MongoDB 없거나 실패 시)
