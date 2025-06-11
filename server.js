@@ -181,8 +181,25 @@ app.get('/api/status', (req, res) => {
 // 선택된 입찰공고 저장 API
 app.post('/api/selected-bids', async (req, res) => {
     try {
-        const { selectedBids } = req.body;
-        await saveData('selected-bids.json', selectedBids);
+        // 새로운 구조 (selectedBids + checkOrder) 또는 기존 구조 (selectedBids만) 처리
+        const requestData = req.body;
+        let dataToSave;
+        
+        if (requestData.selectedBids && requestData.checkOrder) {
+            // 새로운 구조
+            dataToSave = {
+                selectedBids: requestData.selectedBids,
+                checkOrder: requestData.checkOrder
+            };
+        } else if (requestData.selectedBids) {
+            // 기존 구조 (하위 호환성)
+            dataToSave = requestData.selectedBids;
+        } else {
+            // 매우 오래된 구조
+            dataToSave = requestData;
+        }
+        
+        await saveData('selected-bids.json', dataToSave);
         
         res.json({
             success: true,
@@ -340,7 +357,22 @@ app.get('/api/saved-selections', async (req, res) => {
 // 선택된 입찰공고 저장 (날짜/시간 자동 생성)
 app.post('/api/save-selection', async (req, res) => {
     try {
-        const { selectedBids } = req.body;
+        const requestData = req.body;
+        let selectedBids, checkOrder;
+        
+        // 새로운 구조 처리
+        if (requestData.selectedBids && requestData.checkOrder) {
+            selectedBids = requestData.selectedBids;
+            checkOrder = requestData.checkOrder;
+        } else if (requestData.selectedBids) {
+            // 기존 구조 (하위 호환성)
+            selectedBids = requestData.selectedBids;
+            checkOrder = Object.keys(selectedBids);
+        } else {
+            // 매우 오래된 구조
+            selectedBids = requestData;
+            checkOrder = Object.keys(selectedBids);
+        }
         
         if (!selectedBids || Object.keys(selectedBids).length === 0) {
             return res.status(400).json({
@@ -374,7 +406,12 @@ app.post('/api/save-selection', async (req, res) => {
         
         console.log(`저장 시작: ${filename}, 항목 수: ${Object.keys(selectedBids).length}`);
         
-        await saveData(filename, selectedBids);
+        const dataToSave = {
+            selectedBids: selectedBids,
+            checkOrder: checkOrder
+        };
+        
+        await saveData(filename, dataToSave);
         
         const itemCount = Object.keys(selectedBids).length;
         
