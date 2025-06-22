@@ -58,7 +58,19 @@ app.post('/api/update', async (req, res) => {
         
         // 기존 데이터 로드
         const existingBids = await loadData('bids.json') || [];
-        const existingSelectedBids = await loadData('selected-bids.json') || {};
+        const existingSelectedBidsData = await loadData('selected-bids.json') || {};
+        
+        // 선택된 입찰공고 데이터 구조 처리
+        let existingSelectedBids, existingCheckOrder;
+        if (existingSelectedBidsData.selectedBids && existingSelectedBidsData.checkOrder) {
+            // 새로운 구조
+            existingSelectedBids = existingSelectedBidsData.selectedBids;
+            existingCheckOrder = existingSelectedBidsData.checkOrder;
+        } else {
+            // 기존 구조 (하위 호환성)
+            existingSelectedBids = existingSelectedBidsData;
+            existingCheckOrder = Object.keys(existingSelectedBidsData);
+        }
         
         // 새 데이터 수집
         const newBids = await scrapeBids();
@@ -78,8 +90,12 @@ app.post('/api/update', async (req, res) => {
         // 1. 삭제된 공고나 날짜가 변경된 공고 제거
         const newBidsMap = new Map(newBids.map(bid => [bid.id, bid]));
         const updatedSelectedBids = {};
+        const updatedCheckOrder = [];
         
-        Object.entries(existingSelectedBids).forEach(([bidId, selectedBidData]) => {
+        existingCheckOrder.forEach(bidId => {
+            const selectedBidData = existingSelectedBids[bidId];
+            if (!selectedBidData) return; // 데이터가 없으면 건너뛰기
+            
             const newBid = newBidsMap.get(bidId);
             
             if (!newBid) {
@@ -110,6 +126,9 @@ app.post('/api/update', async (req, res) => {
                 sitePT: selectedBidData.sitePT || { enabled: false, date: '', time: '' }
             };
             
+            // 체크 순서도 유지
+            updatedCheckOrder.push(bidId);
+            
             // 데이터가 실제로 변경되었는지 확인
             const oldData = JSON.stringify(selectedBidData);
             const newData = JSON.stringify(updatedSelectedBids[bidId]);
@@ -123,13 +142,16 @@ app.post('/api/update', async (req, res) => {
             if (existingSelectedBids[newBid.id]) {
                 invalidSelectionCount++;
                 console.log(`잘못 선택된 새 공고 발견: ${newBid.aptName || newBid.id}`);
-                // 선택 목록에서 제거
-                delete updatedSelectedBids[newBid.id];
+                // 선택 목록에서 제거 (이미 updatedSelectedBids에 없으므로 추가 작업 불필요)
             }
         });
         
-        // 업데이트된 선택된 입찰공고 저장
-        await saveData('selected-bids.json', updatedSelectedBids);
+        // 업데이트된 선택된 입찰공고 저장 (새로운 구조로)
+        const finalSelectedBidsData = {
+            selectedBids: updatedSelectedBids,
+            checkOrder: updatedCheckOrder
+        };
+        await saveData('selected-bids.json', finalSelectedBidsData);
         
         lastUpdateTime = new Date().toISOString();
         
