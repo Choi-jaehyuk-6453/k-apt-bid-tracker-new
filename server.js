@@ -46,168 +46,95 @@ app.get('/api/bids', async (req, res) => {
 
 app.post('/api/update', async (req, res) => {
     if (isUpdating) {
-        return res.json({
-            success: false,
-            message: '이미 업데이트가 진행 중입니다.'
-        });
+        return res.json({ success: false, message: '이미 업데이트가 진행 중입니다.' });
     }
 
     try {
         isUpdating = true;
         console.log('수동 업데이트 시작...');
         
-        // 기존 데이터 로드
+        // 1. 데이터 로드 (기존 공고, ★사용자 선택 목록, 신규 공고)
         const existingBids = await loadData('bids.json') || [];
-        const existingSelectedBids = await loadData('selected-bids.json') || {};
-        
-        // 새 데이터 수집
+        const existingSelectedData = await loadData('selected-bids.json') || {};
         const newBids = await scrapeBids();
-        
-        // 기존 입찰공고 ID와 날짜 매핑
-        const existingBidMap = new Map();
-        existingBids.forEach(bid => {
-            existingBidMap.set(bid.id, {
-                ...bid,
-                postDate: bid.postDate
-            });
-        });
-        
-        // 새로운 입찰공고 ID와 날짜 매핑
-        const newBidMap = new Map();
-        newBids.forEach(bid => {
-            newBidMap.set(bid.id, {
-                ...bid,
-                postDate: bid.postDate
-            });
-        });
-        
-        // 선택된 입찰공고 정리 및 변경사항 추적
-        let cleanedSelectedBids = {};
+
+        // 2. 빠른 조회를 위한 Map 생성
+        const existingBidMap = new Map(existingBids.map(b => [b.id, b]));
+        const newBidMap = new Map(newBids.map(b => [b.id, b]));
+
+        // 3. ★사용자 선택 목록을 기준으로 데이터 정리
+        const { selectedBids: oldSelectedMap = {}, checkOrder: oldCheckOrder = [] } = existingSelectedData;
+        const finalSelectedMap = {};
         let removedCount = 0;
         let updatedCount = 0;
         let unchangedCount = 0;
-        
-        // 선택된 입찰공고 데이터 구조 처리
-        let selectedBidsData, selectedCheckOrder;
-        if (existingSelectedBids.selectedBids && existingSelectedBids.checkOrder) {
-            selectedBidsData = existingSelectedBids.selectedBids;
-            selectedCheckOrder = existingSelectedBids.checkOrder;
-        } else {
-            selectedBidsData = existingSelectedBids;
-            selectedCheckOrder = Object.keys(existingSelectedBids);
-        }
-        
-        // 각 선택된 입찰공고 검사
-        Object.entries(selectedBidsData).forEach(([bidId, bidData]) => {
-            const newBid = newBidMap.get(bidId);
-            const existingBid = existingBidMap.get(bidId);
+
+        // 사용자가 선택한 순서(checkOrder)를 따라 하나씩 확인
+        oldCheckOrder.forEach(bidId => {
+            const userSelection = oldSelectedMap[bidId];
+            if (!userSelection) return; // checkOrder에 있지만, 데이터가 없는 경우 건너뛰기
+
+            const latestBidData = newBidMap.get(bidId);
             
-            if (!newBid) {
-                // 입찰공고가 완전히 사라진 경우
+            // --- 제거 규칙 검사 ---
+            if (!latestBidData) {
+                // 규칙 1: 공고가 최신 목록에 없음 (삭제됨)
                 removedCount++;
-                console.log(`제거됨: ${bidData.aptName} (ID: ${bidId}) - 입찰공고가 사라짐`);
-                return;
+                console.log(`[제거] "${userSelection.aptName}": 최신 목록에 없어 삭제합니다.`);
+                return; // 최종 목록에 추가하지 않고 건너뜀
             }
-            
-            if (!existingBid) {
-                // 새로 추가된 입찰공고인데 선택되어 있는 경우 (잘못된 상태)
+
+            const previousBidData = existingBidMap.get(bidId);
+            if (previousBidData && previousBidData.postDate !== latestBidData.postDate) {
+                // 규칙 2: 공고일이 변경됨
                 removedCount++;
-                console.log(`제거됨: ${bidData.aptName} (ID: ${bidId}) - 새로 추가된 공고가 선택되어 있음`);
-                return;
+                console.log(`[제거] "${userSelection.aptName}": 공고일이 변경되어 삭제합니다.`);
+                return; // 최종 목록에 추가하지 않고 건너뜀
             }
-            
-            // 공고일이 변경된 경우
-            if (existingBid.postDate !== newBid.postDate) {
-                removedCount++;
-                console.log(`제거됨: ${bidData.aptName} (ID: ${bidId}) - 공고일 변경: ${existingBid.postDate} → ${newBid.postDate}`);
-                return;
-            }
-            
-            // 기존 데이터 유지 (사용자 설정 보존)
-            cleanedSelectedBids[bidId] = {
-                ...newBid, // 새로운 데이터로 업데이트
-                // 사용자 설정 유지
-                bidTime: bidData.bidTime || '',
-                submissionMethod: bidData.submissionMethod || '전자',
-                siteVisit: bidData.siteVisit || { enabled: false, date: '', startTime: '', endTime: '' },
-                sitePT: bidData.sitePT || { enabled: false, date: '', time: '' }
+
+            // --- 데이터 보존 및 업데이트 ---
+            // 모든 검사를 통과했으므로 최종 목록에 포함
+            finalSelectedMap[bidId] = {
+                ...latestBidData, // 최신 공고 정보를 기본으로 설정
+                // 사용자가 직접 입력한 세부 정보는 그대로 유지
+                bidTime: userSelection.bidTime || '',
+                submissionMethod: userSelection.submissionMethod || '전자',
+                siteVisit: userSelection.siteVisit || { enabled: false, date: '', startTime: '', endTime: '' },
+                sitePT: userSelection.sitePT || { enabled: false, date: '', time: '' },
             };
-            
-            // 데이터가 변경되었는지 확인
-            const hasChanges = JSON.stringify(existingBid) !== JSON.stringify(newBid);
-            if (hasChanges) {
+
+            // 통계 카운트
+            if (previousBidData && JSON.stringify(previousBidData) !== JSON.stringify(latestBidData)) {
                 updatedCount++;
-                console.log(`업데이트됨: ${bidData.aptName} (ID: ${bidId})`);
-            } else {
+            } else if (previousBidData) {
                 unchangedCount++;
             }
         });
+
+        const finalCheckOrder = oldCheckOrder.filter(bidId => finalSelectedMap[bidId]);
         
-        // 새로운 공고 중 선택된 것이 있는지 확인 (잘못된 상태)
-        const newBidIds = new Set(newBids.map(bid => bid.id));
+        // 4. 새로 추가된 공고 계산
         const existingBidIds = new Set(existingBids.map(bid => bid.id));
         const newlyAddedBids = newBids.filter(bid => !existingBidIds.has(bid.id));
-        
-        // 선택된 입찰공고에서 새로 추가된 공고 제거
-        const finalSelectedBids = {};
-        Object.entries(cleanedSelectedBids).forEach(([bidId, bidData]) => {
-            if (!newlyAddedBids.some(bid => bid.id === bidId)) {
-                finalSelectedBids[bidId] = bidData;
-            } else {
-                removedCount++;
-                console.log(`제거됨: ${bidData.aptName} (ID: ${bidId}) - 새로 추가된 공고가 선택되어 있음`);
-            }
-        });
-        
-        // 체크 순서도 정리
-        const finalCheckOrder = selectedCheckOrder.filter(bidId => finalSelectedBids[bidId]);
-        
-        // 데이터 저장
+
+        // 5. 최종 데이터 저장
         await saveData('bids.json', newBids);
-        
-        // 선택된 입찰공고 저장 (새로운 구조)
-        const finalSelectedBidsData = {
-            selectedBids: finalSelectedBids,
+        await saveData('selected-bids.json', {
+            selectedBids: finalSelectedMap,
             checkOrder: finalCheckOrder
-        };
-        await saveData('selected-bids.json', finalSelectedBidsData);
-        
+        });
+
         lastUpdateTime = new Date().toISOString();
         
-        // 로그 저장
-        await saveData('logs.json', {
-            timestamp: lastUpdateTime,
-            type: 'manual',
-            totalBids: newBids.length,
-            newBids: newlyAddedBids.length,
-            removedSelected: removedCount,
-            updatedSelected: updatedCount,
-            unchangedSelected: unchangedCount,
-            success: true
-        });
+        console.log(`업데이트 완료: 신규 ${newlyAddedBids.length}건`);
+        console.log(`선택 목록 변경: 제거 ${removedCount}건, 업데이트 ${updatedCount}건, 유지 ${unchangedCount}건`);
 
-        console.log(`업데이트 완료: 총 ${newBids.length}개, 신규 ${newlyAddedBids.length}개`);
-        console.log(`선택된 입찰공고: 제거 ${removedCount}개, 업데이트 ${updatedCount}개, 유지 ${unchangedCount}개`);
-
-        // 상세한 메시지 생성
+        // 6. 클라이언트에 보낼 메시지 생성
         let message = `업데이트가 완료되었습니다.`;
         let details = [];
-        
-        if (newlyAddedBids.length > 0) {
-            details.push(`새로운 공고: ${newlyAddedBids.length}개`);
-        }
-        
-        if (removedCount > 0) {
-            details.push(`선택 목록에서 제거: ${removedCount}개`);
-        }
-        
-        if (updatedCount > 0) {
-            details.push(`선택 목록 업데이트: ${updatedCount}개`);
-        }
-        
-        if (details.length > 0) {
-            message += ` (${details.join(', ')})`;
-        }
+        if (newlyAddedBids.length > 0) details.push(`새로운 공고 ${newlyAddedBids.length}건`);
+        if (removedCount > 0) details.push(`선택 목록에서 ${removedCount}건 제거`);
+        if (details.length > 0) message += ` (${details.join(', ')})`;
 
         res.json({
             success: true,
@@ -216,26 +143,11 @@ app.post('/api/update', async (req, res) => {
             newBids: newlyAddedBids.length,
             removedSelected: removedCount,
             updatedSelected: updatedCount,
-            unchangedSelected: unchangedCount,
-            lastUpdate: lastUpdateTime
         });
 
     } catch (error) {
         console.error('Update error:', error);
-        
-        // 에러 로그 저장
-        await saveData('logs.json', {
-            timestamp: new Date().toISOString(),
-            type: 'manual',
-            success: false,
-            error: error.message
-        });
-
-        res.status(500).json({
-            success: false,
-            message: '업데이트 중 오류가 발생했습니다.',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: '업데이트 중 오류가 발생했습니다.', error: error.message });
     } finally {
         isUpdating = false;
     }
