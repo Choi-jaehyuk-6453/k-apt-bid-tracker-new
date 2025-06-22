@@ -96,16 +96,29 @@ class BidTracker {
 
             if (data.success) {
                 await this.loadData();
-                await this.loadSelectedBids(); // 선택된 입찰공고 다시 로드
+                await this.loadSelectedBids();
                 this.updateLastUpdateTime();
                 
                 // 상세한 업데이트 결과 메시지 표시
                 let message = data.message;
-                if (data.removedSelectedBids > 0 || data.invalidSelections > 0) {
-                    message += '\n\n선택된 입찰공고가 자동으로 정리되었습니다.';
-                }
                 
-                this.showSuccess(message);
+                // 추가 정보가 있으면 토스트로 표시
+                if (data.newBids > 0 || data.removedSelected > 0 || data.updatedSelected > 0) {
+                    let details = [];
+                    if (data.newBids > 0) {
+                        details.push(`새로운 공고: ${data.newBids}개`);
+                    }
+                    if (data.removedSelected > 0) {
+                        details.push(`선택 목록에서 제거: ${data.removedSelected}개`);
+                    }
+                    if (data.updatedSelected > 0) {
+                        details.push(`선택 목록 업데이트: ${data.updatedSelected}개`);
+                    }
+                    
+                    this.showToast(`${message}\n${details.join(', ')}`, 'info');
+                } else {
+                    this.showSuccess(message);
+                }
             } else {
                 this.showError(data.message || '업데이트에 실패했습니다.');
             }
@@ -749,127 +762,127 @@ class BidTracker {
             const dateBids = this.selectedBidsByDate.get(this.selectedBidsCurrentDate);
             
             dateBids.forEach(bidId => {
-                if (this.selectedBids.has(bidId)) {
-                    const bidData = this.selectedBids.get(bidId);
-                    html += `
-                        <div class="card mb-2" style="border: 1px solid #dee2e6;">
-                            <div class="card-body py-2 px-3">
-                                <div class="row align-items-center">
-                                    <div class="col-md-4">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <h6 class="card-title mb-1" style="font-size: 0.95rem;">${bidData.aptName} <span class="badge ${this.getMethodBadgeClass(bidData.method)}" style="font-size: 0.7rem;">${bidData.method}</span></h6>
-                                                <p class="card-text small text-muted mb-1" style="font-size: 0.8rem; line-height: 1.2;">${bidData.title}</p>
-                                                <p class="card-text mb-0"><small class="text-muted" style="font-size: 0.75rem;">마감일: ${this.formatDateOnly(bidData.deadline)}</small></p>
+            if (this.selectedBids.has(bidId)) {
+                const bidData = this.selectedBids.get(bidId);
+                html += `
+                    <div class="card mb-2" style="border: 1px solid #dee2e6;">
+                        <div class="card-body py-2 px-3">
+                            <div class="row align-items-center">
+                                <div class="col-md-4">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="card-title mb-1" style="font-size: 0.95rem;">${bidData.aptName} <span class="badge ${this.getMethodBadgeClass(bidData.method)}" style="font-size: 0.7rem;">${bidData.method}</span></h6>
+                                            <p class="card-text small text-muted mb-1" style="font-size: 0.8rem; line-height: 1.2;">${bidData.title}</p>
+                                            <p class="card-text mb-0"><small class="text-muted" style="font-size: 0.75rem;">마감일: ${this.formatDateOnly(bidData.deadline)}</small></p>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-danger p-1" 
+                                                onclick="bidTracker.removeSelectedBid('${bidId}')" 
+                                                title="선택 해제" style="font-size: 0.8rem;">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="mb-1">
+                                        <label class="form-label small mb-1" style="font-size: 0.75rem;">입찰시간</label>
+                                        <select class="form-select form-select-sm" style="font-size: 0.8rem;"
+                                                onchange="bidTracker.updateBidDetail('${bidId}', 'bidTime', undefined, this.value)">
+                                            ${this.generateTimeOptions(bidData.bidTime)}
+                                        </select>
+                                    </div>
+                                    <div class="mb-1">
+                                        <label class="form-label small mb-1" style="font-size: 0.75rem;">제출방법</label>
+                                        <select class="form-select form-select-sm" style="font-size: 0.8rem;"
+                                                onchange="bidTracker.updateBidDetail('${bidId}', 'submissionMethod', undefined, this.value)">
+                                            <option value="전자" ${bidData.submissionMethod === '전자' ? 'selected' : ''}>전자</option>
+                                            <option value="직접" ${bidData.submissionMethod === '직접' ? 'selected' : ''}>직접</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="row mb-1">
+                                        <div class="col-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" 
+                                                       id="siteVisit_${bidId}" 
+                                                       ${bidData.siteVisit.enabled ? 'checked' : ''}
+                                                       onchange="bidTracker.updateBidDetail('${bidId}', 'siteVisit', 'enabled', this.checked)">
+                                                <label class="form-check-label small" for="siteVisit_${bidId}" style="font-size: 0.75rem;">
+                                                    현장설명회
+                                                </label>
                                             </div>
-                                            <button class="btn btn-sm btn-outline-danger p-1" 
-                                                    onclick="bidTracker.removeSelectedBid('${bidId}')" 
-                                                    title="선택 해제" style="font-size: 0.8rem;">
-                                                <i class="bi bi-x-circle"></i>
-                                            </button>
+                                        </div>
+                                        <div class="col-9">
+                                            <div class="row g-1">
+                                                <div class="col-4">
+                                                    <input type="date" class="form-control form-control-sm" style="font-size: 0.75rem;"
+                                                           value="${bidData.siteVisit.date}"
+                                                           ${!bidData.siteVisit.enabled ? 'disabled' : ''}
+                                                           onchange="bidTracker.updateBidDetail('${bidId}', 'siteVisit', 'date', this.value)">
+                                                </div>
+                                                <div class="col-4">
+                                                    <select class="form-select form-select-sm" style="font-size: 0.75rem;"
+                                                            ${!bidData.siteVisit.enabled ? 'disabled' : ''}
+                                                            onchange="bidTracker.updateBidDetail('${bidId}', 'siteVisit', 'startTime', this.value)">
+                                                        ${this.generateTimeOptions(bidData.siteVisit.startTime)}
+                                                    </select>
+                                                </div>
+                                                <div class="col-4">
+                                                    <select class="form-select form-select-sm" style="font-size: 0.75rem;"
+                                                            ${!bidData.siteVisit.enabled ? 'disabled' : ''}
+                                                            onchange="bidTracker.updateBidDetail('${bidId}', 'siteVisit', 'endTime', this.value)">
+                                                        ${this.generateTimeOptions(bidData.siteVisit.endTime)}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="row g-1 mt-0">
+                                                <div class="col-4"><small class="text-muted" style="font-size: 0.65rem;">날짜</small></div>
+                                                <div class="col-4"><small class="text-muted" style="font-size: 0.65rem;">시작</small></div>
+                                                <div class="col-4"><small class="text-muted" style="font-size: 0.65rem;">종료</small></div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="col-md-2">
-                                        <div class="mb-1">
-                                            <label class="form-label small mb-1" style="font-size: 0.75rem;">입찰시간</label>
-                                            <select class="form-select form-select-sm" style="font-size: 0.8rem;"
-                                                    onchange="bidTracker.updateBidDetail('${bidId}', 'bidTime', undefined, this.value)">
-                                                ${this.generateTimeOptions(bidData.bidTime)}
-                                            </select>
-                                        </div>
-                                        <div class="mb-1">
-                                            <label class="form-label small mb-1" style="font-size: 0.75rem;">제출방법</label>
-                                            <select class="form-select form-select-sm" style="font-size: 0.8rem;"
-                                                    onchange="bidTracker.updateBidDetail('${bidId}', 'submissionMethod', undefined, this.value)">
-                                                <option value="전자" ${bidData.submissionMethod === '전자' ? 'selected' : ''}>전자</option>
-                                                <option value="직접" ${bidData.submissionMethod === '직접' ? 'selected' : ''}>직접</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="row mb-1">
-                                            <div class="col-3">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" 
-                                                           id="siteVisit_${bidId}" 
-                                                           ${bidData.siteVisit.enabled ? 'checked' : ''}
-                                                           onchange="bidTracker.updateBidDetail('${bidId}', 'siteVisit', 'enabled', this.checked)">
-                                                    <label class="form-check-label small" for="siteVisit_${bidId}" style="font-size: 0.75rem;">
-                                                        현장설명회
-                                                    </label>
-                                                </div>
-                                            </div>
-                                            <div class="col-9">
-                                                <div class="row g-1">
-                                                    <div class="col-4">
-                                                        <input type="date" class="form-control form-control-sm" style="font-size: 0.75rem;"
-                                                               value="${bidData.siteVisit.date}"
-                                                               ${!bidData.siteVisit.enabled ? 'disabled' : ''}
-                                                               onchange="bidTracker.updateBidDetail('${bidId}', 'siteVisit', 'date', this.value)">
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <select class="form-select form-select-sm" style="font-size: 0.75rem;"
-                                                                ${!bidData.siteVisit.enabled ? 'disabled' : ''}
-                                                                onchange="bidTracker.updateBidDetail('${bidId}', 'siteVisit', 'startTime', this.value)">
-                                                            ${this.generateTimeOptions(bidData.siteVisit.startTime)}
-                                                        </select>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <select class="form-select form-select-sm" style="font-size: 0.75rem;"
-                                                                ${!bidData.siteVisit.enabled ? 'disabled' : ''}
-                                                                onchange="bidTracker.updateBidDetail('${bidId}', 'siteVisit', 'endTime', this.value)">
-                                                            ${this.generateTimeOptions(bidData.siteVisit.endTime)}
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                                <div class="row g-1 mt-0">
-                                                    <div class="col-4"><small class="text-muted" style="font-size: 0.65rem;">날짜</small></div>
-                                                    <div class="col-4"><small class="text-muted" style="font-size: 0.65rem;">시작</small></div>
-                                                    <div class="col-4"><small class="text-muted" style="font-size: 0.65rem;">종료</small></div>
-                                                </div>
+                                    <div class="row">
+                                        <div class="col-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" 
+                                                       id="sitePT_${bidId}" 
+                                                       ${bidData.sitePT.enabled ? 'checked' : ''}
+                                                       onchange="bidTracker.updateBidDetail('${bidId}', 'sitePT', 'enabled', this.checked)">
+                                                <label class="form-check-label small" for="sitePT_${bidId}" style="font-size: 0.75rem;">
+                                                    현장PT
+                                                </label>
                                             </div>
                                         </div>
-                                        <div class="row">
-                                            <div class="col-3">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" 
-                                                           id="sitePT_${bidId}" 
-                                                           ${bidData.sitePT.enabled ? 'checked' : ''}
-                                                           onchange="bidTracker.updateBidDetail('${bidId}', 'sitePT', 'enabled', this.checked)">
-                                                    <label class="form-check-label small" for="sitePT_${bidId}" style="font-size: 0.75rem;">
-                                                        현장PT
-                                                    </label>
+                                        <div class="col-9">
+                                            <div class="row g-1">
+                                                <div class="col-6">
+                                                    <input type="date" class="form-control form-control-sm" style="font-size: 0.75rem;"
+                                                           value="${bidData.sitePT.date}"
+                                                           ${!bidData.sitePT.enabled ? 'disabled' : ''}
+                                                           onchange="bidTracker.updateBidDetail('${bidId}', 'sitePT', 'date', this.value)">
+                                                </div>
+                                                <div class="col-6">
+                                                    <select class="form-select form-select-sm" style="font-size: 0.75rem;"
+                                                            ${!bidData.sitePT.enabled ? 'disabled' : ''}
+                                                            onchange="bidTracker.updateBidDetail('${bidId}', 'sitePT', 'time', this.value)">
+                                                        ${this.generateTimeOptions(bidData.sitePT.time)}
+                                                    </select>
                                                 </div>
                                             </div>
-                                            <div class="col-9">
-                                                <div class="row g-1">
-                                                    <div class="col-6">
-                                                        <input type="date" class="form-control form-control-sm" style="font-size: 0.75rem;"
-                                                               value="${bidData.sitePT.date}"
-                                                               ${!bidData.sitePT.enabled ? 'disabled' : ''}
-                                                               onchange="bidTracker.updateBidDetail('${bidId}', 'sitePT', 'date', this.value)">
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <select class="form-select form-select-sm" style="font-size: 0.75rem;"
-                                                                ${!bidData.sitePT.enabled ? 'disabled' : ''}
-                                                                onchange="bidTracker.updateBidDetail('${bidId}', 'sitePT', 'time', this.value)">
-                                                            ${this.generateTimeOptions(bidData.sitePT.time)}
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                                <div class="row g-1 mt-0">
-                                                    <div class="col-6"><small class="text-muted" style="font-size: 0.65rem;">날짜</small></div>
-                                                    <div class="col-6"><small class="text-muted" style="font-size: 0.65rem;">시간</small></div>
-                                                </div>
+                                            <div class="row g-1 mt-0">
+                                                <div class="col-6"><small class="text-muted" style="font-size: 0.65rem;">날짜</small></div>
+                                                <div class="col-6"><small class="text-muted" style="font-size: 0.65rem;">시간</small></div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    `;
-                }
-            });
+                    </div>
+                `;
+            }
+        });
         }
         
         container.innerHTML = html;
@@ -985,13 +998,6 @@ class BidTracker {
             
             if (data.success) {
                 serverData = data.selectedBids;
-                // 서버에서 체크 순서도 함께 받아옴
-                if (data.checkOrder) {
-                    serverData = {
-                        selectedBids: data.selectedBids,
-                        checkOrder: data.checkOrder
-                    };
-                }
             }
         } catch (error) {
             console.error('서버에서 선택 정보 로드 실패:', error);
@@ -1040,12 +1046,8 @@ class BidTracker {
             // 새로운 구조
             finalData = finalDataSource.selectedBids;
             savedCheckOrder = finalDataSource.checkOrder;
-        } else if (finalDataSource.selectedBids) {
-            // 기존 구조 (하위 호환성)
-            finalData = finalDataSource.selectedBids;
-            savedCheckOrder = Object.keys(finalDataSource.selectedBids);
         } else {
-            // 매우 오래된 구조
+            // 기존 구조 (하위 호환성)
             finalData = finalDataSource;
             savedCheckOrder = Object.keys(finalDataSource);
         }
@@ -1085,7 +1087,7 @@ class BidTracker {
             this.checkOrder = [...this.checkOrder, ...newIds];
         } else {
             // 저장된 순서가 없으면 키 순서로
-            this.checkOrder = Object.keys(finalData);
+        this.checkOrder = Object.keys(finalData);
         }
         
         this.updateSelectedBidsDisplay();
@@ -1147,6 +1149,8 @@ class BidTracker {
             this.showSuccess('선택된 입찰공고가 제거되었습니다.');
         }
     }
+
+
 
     // 현재 선택 저장
     async saveCurrentSelection() {
