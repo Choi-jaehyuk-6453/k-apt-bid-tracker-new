@@ -53,71 +53,50 @@ app.post('/api/update', async (req, res) => {
         isUpdating = true;
         console.log('수동 업데이트 시작...');
         
-        // 1. 데이터 로드 (기존 공고, ★사용자 선택 목록, 신규 공고)
         const existingBids = await loadData('bids.json') || [];
         const existingSelectedData = await loadData('selected-bids.json') || {};
         const newBids = await scrapeBids();
 
-        // 2. 빠른 조회를 위한 Map 생성
-        const existingBidMap = new Map(existingBids.map(b => [b.id, b]));
         const newBidMap = new Map(newBids.map(b => [b.id, b]));
 
-        // 3. ★사용자 선택 목록을 기준으로 데이터 정리
         const { selectedBids: oldSelectedMap = {}, checkOrder: oldCheckOrder = [] } = existingSelectedData;
         const finalSelectedMap = {};
         let removedCount = 0;
         let updatedCount = 0;
-        let unchangedCount = 0;
 
-        // 사용자가 선택한 순서(checkOrder)를 따라 하나씩 확인
         oldCheckOrder.forEach(bidId => {
             const userSelection = oldSelectedMap[bidId];
-            if (!userSelection) return; // checkOrder에 있지만, 데이터가 없는 경우 건너뛰기
+            if (!userSelection) return;
 
             const latestBidData = newBidMap.get(bidId);
             
-            // --- 제거 규칙 검사 ---
             if (!latestBidData) {
-                // 규칙 1: 공고가 최신 목록에 없음 (삭제됨)
                 removedCount++;
                 console.log(`[제거] "${userSelection.aptName}": 최신 목록에 없어 삭제합니다.`);
-                return; // 최종 목록에 추가하지 않고 건너뜀
+                return;
             }
 
-            const previousBidData = existingBidMap.get(bidId);
-            if (previousBidData && previousBidData.postDate !== latestBidData.postDate) {
-                // 규칙 2: 공고일이 변경됨
+            if (userSelection.postDate !== latestBidData.postDate) {
                 removedCount++;
-                console.log(`[제거] "${userSelection.aptName}": 공고일이 변경되어 삭제합니다.`);
-                return; // 최종 목록에 추가하지 않고 건너뜀
+                console.log(`[제거] "${userSelection.aptName}": 공고일이 변경되어 삭제합니다. (기존: ${userSelection.postDate}, 최신: ${latestBidData.postDate})`);
+                return;
             }
 
-            // --- 데이터 보존 및 업데이트 ---
-            // 모든 검사를 통과했으므로 최종 목록에 포함
             finalSelectedMap[bidId] = {
-                ...latestBidData, // 최신 공고 정보를 기본으로 설정
-                // 사용자가 직접 입력한 세부 정보는 그대로 유지
-                bidTime: userSelection.bidTime || '',
-                submissionMethod: userSelection.submissionMethod || '전자',
-                siteVisit: userSelection.siteVisit || { enabled: false, date: '', startTime: '', endTime: '' },
-                sitePT: userSelection.sitePT || { enabled: false, date: '', time: '' },
+                ...userSelection,
+                ...latestBidData,
             };
 
-            // 통계 카운트
-            if (previousBidData && JSON.stringify(previousBidData) !== JSON.stringify(latestBidData)) {
+            if (JSON.stringify(userSelection) !== JSON.stringify(finalSelectedMap[bidId])) {
                 updatedCount++;
-            } else if (previousBidData) {
-                unchangedCount++;
             }
         });
 
         const finalCheckOrder = oldCheckOrder.filter(bidId => finalSelectedMap[bidId]);
         
-        // 4. 새로 추가된 공고 계산
         const existingBidIds = new Set(existingBids.map(bid => bid.id));
         const newlyAddedBids = newBids.filter(bid => !existingBidIds.has(bid.id));
 
-        // 5. 최종 데이터 저장
         await saveData('bids.json', newBids);
         await saveData('selected-bids.json', {
             selectedBids: finalSelectedMap,
@@ -126,10 +105,8 @@ app.post('/api/update', async (req, res) => {
 
         lastUpdateTime = new Date().toISOString();
         
-        console.log(`업데이트 완료: 신규 ${newlyAddedBids.length}건`);
-        console.log(`선택 목록 변경: 제거 ${removedCount}건, 업데이트 ${updatedCount}건, 유지 ${unchangedCount}건`);
+        console.log(`업데이트 완료: 신규 ${newlyAddedBids.length}건, 선택목록 제거 ${removedCount}건, 업데이트 ${updatedCount}건`);
 
-        // 6. 클라이언트에 보낼 메시지 생성
         let message = `업데이트가 완료되었습니다.`;
         let details = [];
         if (newlyAddedBids.length > 0) details.push(`새로운 공고 ${newlyAddedBids.length}건`);
@@ -139,10 +116,8 @@ app.post('/api/update', async (req, res) => {
         res.json({
             success: true,
             message: message,
-            totalBids: newBids.length,
             newBids: newlyAddedBids.length,
             removedSelected: removedCount,
-            updatedSelected: updatedCount,
         });
 
     } catch (error) {
