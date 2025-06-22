@@ -19,10 +19,9 @@ class BidTracker {
 
     async init() {
         this.bindEvents();
-        await this.loadData();
         await this.loadSelectedBids();
+        await this.loadData();
         this.updateStats();
-        this.applyFilters();
         this.startKeepAlive(); // Keep-alive 시작
     }
 
@@ -70,8 +69,6 @@ class BidTracker {
             
             if (data.success) {
                 this.bids = data.bids || [];
-                this.cleanupSelectedBids(); // 없어진 공고 제거
-                this.preserveCheckboxStates(); // 기존 체크 상태 유지
                 this.applyFilters();
                 this.updateStatistics();
             } else {
@@ -95,8 +92,8 @@ class BidTracker {
             const data = await response.json();
 
             if (data.success) {
-                await this.loadData();
                 await this.loadSelectedBids();
+                await this.loadData();
                 this.updateLastUpdateTime();
                 
                 // 상세한 업데이트 결과 메시지 표시
@@ -115,7 +112,7 @@ class BidTracker {
                         details.push(`선택 목록 업데이트: ${data.updatedSelected}개`);
                     }
                     
-                    this.showToast(`${message}\n${details.join(', ')}`, 'info');
+                    this.showToast(`${message}<br>${details.join(', ')}`, 'info');
                 } else {
                     this.showSuccess(message);
                 }
@@ -679,38 +676,6 @@ class BidTracker {
         });
     }
 
-    // 기존 체크 상태 유지 함수 (새로 크롤링된 데이터에서)
-    preserveCheckboxStates() {
-        // 현재 선택된 입찰공고 ID들을 저장
-        const currentSelectedIds = new Set(this.selectedBids.keys());
-        
-        // 새로 로드된 데이터에서 기존 선택된 공고들만 유지
-        const updatedSelectedBids = new Map();
-        const updatedCheckOrder = [];
-        
-        // 기존 체크 순서를 유지하면서 현재 데이터에 존재하는 것만 필터링
-        this.checkOrder.forEach(bidId => {
-            const bid = this.bids.find(b => b.id === bidId);
-            if (bid && currentSelectedIds.has(bidId)) {
-                const existingBidData = this.selectedBids.get(bidId);
-                updatedSelectedBids.set(bidId, {
-                    ...bid, // 새로운 데이터로 업데이트
-                    // 기존 사용자 설정 유지
-                    bidTime: existingBidData.bidTime || '',
-                    submissionMethod: existingBidData.submissionMethod || '전자',
-                    siteVisit: existingBidData.siteVisit || { enabled: false, date: '', startTime: '', endTime: '' },
-                    sitePT: existingBidData.sitePT || { enabled: false, date: '', time: '' }
-                });
-                updatedCheckOrder.push(bidId);
-            }
-        });
-        
-        this.selectedBids = updatedSelectedBids;
-        this.checkOrder = updatedCheckOrder;
-        
-        console.log(`체크 상태 유지: ${updatedSelectedBids.size}건 유지됨`);
-    }
-
     updateSelectedBidsDisplay() {
         const container = document.getElementById('selectedBidsContainer');
         const countBadge = document.getElementById('selectedBidsCount');
@@ -1112,24 +1077,6 @@ class BidTracker {
         this.saveSelectedBids();
     }
 
-    cleanupSelectedBids() {
-        const currentBidIds = new Set(this.bids.map(bid => bid.id));
-        const toRemove = [];
-        
-        this.selectedBids.forEach((bidData, bidId) => {
-            if (!currentBidIds.has(bidId)) {
-                toRemove.push(bidId);
-            }
-        });
-        
-        if (toRemove.length > 0) {
-            toRemove.forEach(bidId => this.selectedBids.delete(bidId));
-            this.saveSelectedBids();
-            this.updateSelectedBidsDisplay();
-            console.log(`제거된 선택 공고: ${toRemove.length}건`);
-        }
-    }
-
     // 개별 선택된 입찰공고 삭제
     removeSelectedBid(bidId) {
         if (this.selectedBids.has(bidId)) {
@@ -1149,8 +1096,6 @@ class BidTracker {
             this.showSuccess('선택된 입찰공고가 제거되었습니다.');
         }
     }
-
-
 
     // 현재 선택 저장
     async saveCurrentSelection() {
