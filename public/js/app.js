@@ -96,8 +96,16 @@ class BidTracker {
 
             if (data.success) {
                 await this.loadData();
+                await this.loadSelectedBids(); // 선택된 입찰공고 다시 로드
                 this.updateLastUpdateTime();
-                this.showSuccess('업데이트가 완료되었습니다.');
+                
+                // 상세한 업데이트 결과 메시지 표시
+                let message = data.message;
+                if (data.removedSelectedBids > 0 || data.invalidSelections > 0) {
+                    message += '\n\n선택된 입찰공고가 자동으로 정리되었습니다.';
+                }
+                
+                this.showSuccess(message);
             } else {
                 this.showError(data.message || '업데이트에 실패했습니다.');
             }
@@ -977,6 +985,13 @@ class BidTracker {
             
             if (data.success) {
                 serverData = data.selectedBids;
+                // 서버에서 체크 순서도 함께 받아옴
+                if (data.checkOrder) {
+                    serverData = {
+                        selectedBids: data.selectedBids,
+                        checkOrder: data.checkOrder
+                    };
+                }
             }
         } catch (error) {
             console.error('서버에서 선택 정보 로드 실패:', error);
@@ -1025,8 +1040,12 @@ class BidTracker {
             // 새로운 구조
             finalData = finalDataSource.selectedBids;
             savedCheckOrder = finalDataSource.checkOrder;
-        } else {
+        } else if (finalDataSource.selectedBids) {
             // 기존 구조 (하위 호환성)
+            finalData = finalDataSource.selectedBids;
+            savedCheckOrder = Object.keys(finalDataSource.selectedBids);
+        } else {
+            // 매우 오래된 구조
             finalData = finalDataSource;
             savedCheckOrder = Object.keys(finalDataSource);
         }
@@ -1128,8 +1147,6 @@ class BidTracker {
             this.showSuccess('선택된 입찰공고가 제거되었습니다.');
         }
     }
-
-
 
     // 현재 선택 저장
     async saveCurrentSelection() {

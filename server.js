@@ -1,12 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const schedule = require('node-schedule');
 
 // Import modules
 const { scrapeBids } = require('./modules/scraper');
 const { saveData, loadData } = require('./modules/storage');
-const { scheduleUpdates, sendNotification } = require('./modules/scheduler');
 const { exportToExcel, exportToHtmlCalendar } = require('./modules/exporter');
 
 const app = express();
@@ -60,6 +58,7 @@ app.post('/api/update', async (req, res) => {
         
         // 기존 데이터 로드
         const existingBids = await loadData('bids.json') || [];
+        const existingSelectedBids = await loadData('selected-bids.json') || {};
         
         // 새 데이터 수집
         const newBids = await scrapeBids();
@@ -71,6 +70,67 @@ app.post('/api/update', async (req, res) => {
         const existingIds = new Set(existingBids.map(bid => bid.id));
         const newlyAdded = newBids.filter(bid => !existingIds.has(bid.id));
         
+        // 선택된 입찰공고 관리
+        let removedCount = 0;
+        let updatedCount = 0;
+        let invalidSelectionCount = 0;
+        
+        // 1. 삭제된 공고나 날짜가 변경된 공고 제거
+        const newBidsMap = new Map(newBids.map(bid => [bid.id, bid]));
+        const updatedSelectedBids = {};
+        
+        Object.entries(existingSelectedBids).forEach(([bidId, selectedBidData]) => {
+            const newBid = newBidsMap.get(bidId);
+            
+            if (!newBid) {
+                // 공고가 삭제됨
+                removedCount++;
+                console.log(`삭제된 공고 제거: ${selectedBidData.aptName || bidId}`);
+                return;
+            }
+            
+            // 날짜가 변경되었는지 확인
+            const oldDeadline = selectedBidData.deadline;
+            const newDeadline = newBid.deadline;
+            
+            if (oldDeadline !== newDeadline) {
+                // 날짜가 변경됨
+                removedCount++;
+                console.log(`날짜 변경된 공고 제거: ${selectedBidData.aptName || bidId} (${oldDeadline} → ${newDeadline})`);
+                return;
+            }
+            
+            // 유효한 공고는 유지하되, 새로운 데이터로 업데이트
+            updatedSelectedBids[bidId] = {
+                ...newBid, // 새로운 데이터로 업데이트
+                // 사용자 설정은 유지
+                bidTime: selectedBidData.bidTime || '',
+                submissionMethod: selectedBidData.submissionMethod || '전자',
+                siteVisit: selectedBidData.siteVisit || { enabled: false, date: '', startTime: '', endTime: '' },
+                sitePT: selectedBidData.sitePT || { enabled: false, date: '', time: '' }
+            };
+            
+            // 데이터가 실제로 변경되었는지 확인
+            const oldData = JSON.stringify(selectedBidData);
+            const newData = JSON.stringify(updatedSelectedBids[bidId]);
+            if (oldData !== newData) {
+                updatedCount++;
+            }
+        });
+        
+        // 2. 새로 추가된 공고 중 잘못 선택된 것들 확인
+        newlyAdded.forEach(newBid => {
+            if (existingSelectedBids[newBid.id]) {
+                invalidSelectionCount++;
+                console.log(`잘못 선택된 새 공고 발견: ${newBid.aptName || newBid.id}`);
+                // 선택 목록에서 제거
+                delete updatedSelectedBids[newBid.id];
+            }
+        });
+        
+        // 업데이트된 선택된 입찰공고 저장
+        await saveData('selected-bids.json', updatedSelectedBids);
+        
         lastUpdateTime = new Date().toISOString();
         
         // 로그 저장
@@ -79,16 +139,47 @@ app.post('/api/update', async (req, res) => {
             type: 'manual',
             totalBids: newBids.length,
             newBids: newlyAdded.length,
+            removedSelectedBids: removedCount,
+            updatedSelectedBids: updatedCount,
+            invalidSelections: invalidSelectionCount,
             success: true
         });
 
         console.log(`업데이트 완료: 총 ${newBids.length}개, 신규 ${newlyAdded.length}개`);
+        console.log(`선택 관리: ${removedCount}개 제거, ${updatedCount}개 업데이트, ${invalidSelectionCount}개 잘못 선택 제거`);
+
+        // 상세한 메시지 생성
+        let message = `업데이트가 완료되었습니다.`;
+        let details = [];
+        
+        if (newlyAdded.length > 0) {
+            details.push(`신규 공고: ${newlyAdded.length}건`);
+        }
+        
+        if (removedCount > 0) {
+            details.push(`선택 제거: ${removedCount}건 (삭제/날짜변경)`);
+        }
+        
+        if (updatedCount > 0) {
+            details.push(`선택 업데이트: ${updatedCount}건`);
+        }
+        
+        if (invalidSelectionCount > 0) {
+            details.push(`잘못 선택 제거: ${invalidSelectionCount}건`);
+        }
+        
+        if (details.length > 0) {
+            message += ` (${details.join(', ')})`;
+        }
 
         res.json({
             success: true,
-            message: '업데이트가 완료되었습니다.',
+            message: message,
             totalBids: newBids.length,
             newBids: newlyAdded.length,
+            removedSelectedBids: removedCount,
+            updatedSelectedBids: updatedCount,
+            invalidSelections: invalidSelectionCount,
             lastUpdate: lastUpdateTime
         });
 
@@ -218,10 +309,24 @@ app.post('/api/selected-bids', async (req, res) => {
 // 선택된 입찰공고 불러오기 API
 app.get('/api/selected-bids', async (req, res) => {
     try {
-        const selectedBids = await loadData('selected-bids.json') || {};
+        const savedData = await loadData('selected-bids.json') || {};
+        
+        // 새로운 구조와 기존 구조 모두 처리
+        let selectedBids, checkOrder;
+        if (savedData.selectedBids && savedData.checkOrder) {
+            // 새로운 구조
+            selectedBids = savedData.selectedBids;
+            checkOrder = savedData.checkOrder;
+        } else {
+            // 기존 구조 (하위 호환성)
+            selectedBids = savedData;
+            checkOrder = Object.keys(savedData);
+        }
+        
         res.json({
             success: true,
-            selectedBids: selectedBids
+            selectedBids: selectedBids,
+            checkOrder: checkOrder
         });
     } catch (error) {
         console.error('Selected bids load error:', error);
@@ -547,74 +652,14 @@ app.delete('/api/saved-selections/:filename', async (req, res) => {
     }
 });
 
-// 자동 업데이트 스케줄러 초기화
-function initializeScheduler() {
-    // 매일 09:00, 17:00에 자동 업데이트
-    schedule.scheduleJob('0 9,17 * * *', async () => {
-        if (isUpdating) {
-            console.log('이미 업데이트가 진행 중입니다. 스케줄된 업데이트를 건너뜁니다.');
-            return;
-        }
-
-        try {
-            isUpdating = true;
-            console.log('자동 업데이트 시작...');
-            
-            const existingBids = await loadData('bids.json') || [];
-            const newBids = await scrapeBids();
-            
-            await saveData('bids.json', newBids);
-            
-            const existingIds = new Set(existingBids.map(bid => bid.id));
-            const newlyAdded = newBids.filter(bid => !existingIds.has(bid.id));
-            
-            lastUpdateTime = new Date().toISOString();
-            
-            // 로그 저장
-            await saveData('logs.json', {
-                timestamp: lastUpdateTime,
-                type: 'scheduled',
-                totalBids: newBids.length,
-                newBids: newlyAdded.length,
-                success: true
-            });
-
-            console.log(`자동 업데이트 완료: 총 ${newBids.length}개, 신규 ${newlyAdded.length}개`);
-            
-            // 새로운 공고가 있으면 알림
-            if (newlyAdded.length > 0) {
-                sendNotification(`새로운 입찰공고 ${newlyAdded.length}건이 등록되었습니다.`);
-            }
-
-        } catch (error) {
-            console.error('자동 업데이트 실패:', error);
-            
-            await saveData('logs.json', {
-                timestamp: new Date().toISOString(),
-                type: 'scheduled',
-                success: false,
-                error: error.message
-            });
-        } finally {
-            isUpdating = false;
-        }
-    });
-
-    console.log('자동 업데이트 스케줄러가 초기화되었습니다. (09:00, 17:00)');
-}
-
 // 서버 시작
 app.listen(PORT, async () => {
     console.log(`🚀 K-apt 입찰공고 관리 시스템이 http://localhost:${PORT} 에서 실행 중입니다.`);
     console.log('📊 시스템 기능:');
-    console.log('   - 자동 데이터 수집 (09:00, 17:00)');
     console.log('   - 수동 업데이트');
     console.log('   - Excel 내보내기');
     console.log('   - PDF 월력 내보내기');
     console.log('   - 실시간 필터링 및 검색');
-    
-    // 스케줄러 초기화
-    initializeScheduler();
     
     // 시작 시 한 번 데이터 로드
     try {
